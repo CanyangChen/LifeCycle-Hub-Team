@@ -1,0 +1,4 @@
+# Database schema and migration ownership
+/drizzle/ @CanyangChen
+/standalone-db.mjs @CanyangChen
+/.github/CODEOWNERS @CanyangChen
