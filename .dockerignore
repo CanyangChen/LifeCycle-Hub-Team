@@ -1,0 +1,11 @@
+*
+!*.mjs
+!catalog.ts
+!styles.css
+!package.json
+!drizzle/
+!drizzle/**
+!vendor/
+!vendor/**
+!.openai/
+!.openai/hosting.json

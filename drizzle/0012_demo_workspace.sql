@@ -1,0 +1,1 @@
+ALTER TABLE DemoAccount ADD COLUMN workspaceVersion INTEGER NOT NULL DEFAULT 0;

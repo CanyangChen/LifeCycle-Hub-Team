@@ -1,0 +1,56 @@
+export function resolveFoodDates(text, day) {
+  const source=String(text??"").normalize("NFKC");
+  const end="(?:过期|到期|有效期至)";
+  const count="[0-9零一二两三四五六七八九十百千]+";
+  const readCount=(value)=>{
+    if (/^\d+$/.test(value)) return Number(value);
+    const digits="零一二三四五六七八九";
+    let total=0,current=0;
+    for (const ch of value.replaceAll("两","二")) {
+      const position=digits.indexOf(ch);
+      if (position>=0) current=position;
+      else { total+=(current||1)*({十:10,百:100,千:1000}[ch]||0); current=0; }
+    }
+    return total+current;
+  };
+  const validDays=(value)=>Number.isInteger(value)&&value>=1&&value<=36500;
+  const durations=[...source.matchAll(new RegExp(`(?:保质期|保存期)\\s*(?:为|是|约|[:：])?\\s*(${count})\\s*[天日]`,"g"))].map((m)=>readCount(m[1]));
+  const variants=[...new Set(durations)];
+  const shelfLifeDays=variants.length===1&&validDays(variants[0])?variants[0]:null;
+  const baseMatches=[
+    /(?:从|自|按)生产(?:日期|日|当天)?(?:开始|起|计算)|生产(?:日期|日)起/,
+    /(?:从|自|按)(?:购买|购入)(?:日期|日|当天)?(?:开始|起|计算)|(?:购买|购入)(?:日期|日)起/,
+  ].map((rx)=>rx.test(source));
+  const shelfLifeBase=shelfLifeDays&&baseMatches[0]!==baseMatches[1]?(baseMatches[0]?"production":"purchase"):"";
+  const dates=[];
+  const add=(value,kind,evidence)=>{
+    dates.push({value:foodDate(value)?value:"",kind,evidence});
+  };
+  for (const match of source.matchAll(new RegExp(`(${count})\\s*(?:天|日)\\s*(?:之)?后\\s*(?:就)?${end}`,"g"))) {
+    const days=readCount(match[1]);
+    add(validDays(days)?foodAddDays(day,days):"","relative",match[0]);
+  }
+  for (const match of source.matchAll(new RegExp(`(今天|明天|后天)\\s*(?:就)?${end}`,"g"))) {
+    add(foodAddDays(day,{今天:0,明天:1,后天:2}[match[1]]),"relative",match[0]);
+  }
+  const datePattern="(?:([0-9]{4})\\s*(?:年|[-/])\\s*)?([0-9]{1,2})\\s*(?:月|[-/])\\s*([0-9]{1,2})\\s*(?:日|号)?";
+  for (const pattern of [`(?<![0-9])${datePattern}\\s*${end}`,`(?:到期(?:日期|日)?|过期(?:日期|日)?|有效期至)\\s*(?:是|为|[:：])?\\s*${datePattern}(?![0-9])`]) {
+    for (const match of source.matchAll(new RegExp(pattern,"g"))) {
+      const [,year,month,date]=match;
+      add(`${year||day.slice(0,4)}-${month.padStart(2,"0")}-${date.padStart(2,"0")}`,year?"stated":"year-confirm",match[0]);
+    }
+  }
+  const uniques=[...new Set(dates.map((entry)=>entry.value))];
+  const production=source.match(new RegExp(`(?:生产(?:日期|日)?)(?:为|是|[:：])?\\s*${datePattern}(?![0-9])`));
+  const producedOn=production?.[1]?`${production[1]}-${production[2].padStart(2,"0")}-${production[3].padStart(2,"0")}`:"";
+  const resolved=uniques.length===1&&uniques[0]?dates[0]:null;
+  const notes=[];
+  if (dates.length&&!resolved) notes.push("到期日期无效或相互冲突，请确认。");
+  if (!dates.length&&/到期|过期|有效期至/.test(source)) notes.push("到期日期尚未明确，请确认。");
+  if (resolved?.kind==="year-confirm") notes.push(`原文没有指定年份，已按录入地的 ${day.slice(0,4)} 年预填，请核对年份。`);
+  if (resolved?.kind==="relative") notes.push(`按录入地日期 ${day} 计算到期日期，请核对。`);
+  if (variants.length&&!shelfLifeDays) notes.push("保质期天数无效或相互冲突，请确认。");
+  if (shelfLifeDays&&!shelfLifeBase&&!resolved) notes.push("已识别保质期天数，请核对从生产日还是购买日起算。");
+  return {expiresOn:resolved?.value||"",expirySource:resolved?.kind||"",shelfLifeDays,shelfLifeBase,dateEvidence:notes.join(" "),
+    producedOn:foodDate(producedOn)?producedOn:""};
+}

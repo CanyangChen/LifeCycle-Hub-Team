@@ -1,0 +1,154 @@
+import { quantityPreview } from "./quantity.mjs";
+
+const packageSpec = document.querySelector("[data-package-spec]");
+const packagePreset = document.querySelector("[data-package-preset]");
+const stockPreview = document.querySelector("[data-stock-preview]");
+if (packageSpec && stockPreview) {
+  const refresh = () => quantityPreview(packageSpec, stockPreview);
+  packageSpec.addEventListener("input", () => {
+    if (packagePreset && packagePreset.value !== packageSpec.value) packagePreset.value = "";
+    refresh();
+  });
+  packagePreset?.addEventListener("change", () => {
+    if (packagePreset.value) packageSpec.value = packagePreset.value;
+    else packageSpec.focus();
+    refresh();
+  });
+  refresh();
+}
+
+const cycle = document.querySelector("[data-billing-cycle]");
+const custom = document.querySelector("[data-custom-cycle]");
+const customInput = custom?.querySelector("input");
+if (cycle && custom && customInput) {
+  const refresh = () => {
+    const enabled = cycle.value === "custom";
+    custom.hidden = !enabled;
+    customInput.disabled = !enabled;
+    customInput.required = enabled;
+  };
+  cycle.addEventListener("change", refresh);
+  refresh();
+}
+
+const profilePicker = document.querySelector("[data-profile-picker]");
+const profileFields = document.querySelector("[data-new-profile]");
+if (profilePicker && profileFields) {
+  const refresh = () => {
+    const visible = profilePicker.value === "new";
+    profileFields.hidden = !visible;
+    profileFields.disabled = !visible;
+  };
+  profilePicker.addEventListener("change", refresh);
+  refresh();
+}
+
+const localNow = new Date();
+const pad = (number) => String(number).padStart(2,"0");
+for (const element of document.querySelectorAll("[data-intake-zone]")) {
+  element.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+const purchaseDate = document.querySelector("[data-purchase-date]");
+const purchaseTime = document.querySelector("[data-purchase-time]");
+if (purchaseDate && purchaseTime) {
+  purchaseDate.value = `${localNow.getFullYear()}-${pad(localNow.getMonth()+1)}-${pad(localNow.getDate())}`;
+  purchaseTime.value = `${pad(localNow.getHours())}:${pad(localNow.getMinutes())}`;
+  const defaultDate=document.querySelector("[data-default-purchase-date]");
+  const defaultTime=document.querySelector("[data-default-purchase-time]");
+  if (defaultDate) defaultDate.value=purchaseDate.value;
+  if (defaultTime) defaultTime.value=purchaseTime.value;
+}
+
+const audioFile = document.querySelector("[data-audio-file]");
+const startRecording = document.querySelector("[data-start-recording]");
+const stopRecording = document.querySelector("[data-stop-recording]");
+const recordingStatus = document.querySelector("[data-recording-status]");
+if (audioFile && startRecording && stopRecording && recordingStatus) {
+  let recorder;
+  let stream;
+  let timer;
+  startRecording.addEventListener("click", async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined" || typeof DataTransfer === "undefined") {
+      recordingStatus.textContent="此浏览器可通过上方选择音频文件。";
+      return;
+    }
+    startRecording.disabled=true;
+    let chunks=[];
+    try {
+      stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      recorder=new MediaRecorder(stream);
+      recorder.addEventListener("dataavailable",(event)=>{ if (event.data.size) chunks.push(event.data); });
+      recorder.addEventListener("stop",()=>{
+        clearTimeout(timer);
+        stream.getTracks().forEach((track)=>track.stop());
+        startRecording.disabled=false;
+        stopRecording.disabled=true;
+        if (!chunks.length) { recordingStatus.textContent="没有录到声音，请重新录制。"; return; }
+        const type=recorder.mimeType||chunks[0].type;
+        const extension=type.includes("mp4")?"m4a":type.includes("ogg")?"ogg":"webm";
+        const files=new DataTransfer();
+        files.items.add(new File(chunks,"food-recording."+extension,{type}));
+        audioFile.files=files.files;
+        recordingStatus.textContent="录音已就绪，点击「转写并提取」。";
+        chunks=[];
+      });
+      recorder.start();
+      stopRecording.disabled=false;
+      recordingStatus.textContent="录音中…";
+      timer=setTimeout(()=>{ if (recorder.state==="recording") recorder.stop(); },90000);
+    } catch {
+      stream?.getTracks().forEach((track)=>track.stop());
+      startRecording.disabled=false;
+      recordingStatus.textContent="无法使用麦克风，可以在上方选择音频文件。";
+    }
+  });
+  stopRecording.addEventListener("click",()=>{ if (recorder?.state==="recording") recorder.stop(); });
+}
+
+const photoTypes = ["image/jpeg","image/png","image/webp","image/gif"];
+async function preparePhoto(file) {
+  if (photoTypes.includes(file.type) && file.size<=2*1024*1024) return file;
+  const bitmap=await createImageBitmap(file);
+  try {
+    const canvas=document.createElement("canvas");
+    const ratio=Math.min(1,2200/Math.max(bitmap.width,bitmap.height));
+    canvas.width=Math.max(1,Math.round(bitmap.width*ratio));
+    canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
+    canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+    const blob=await new Promise((resolve)=>canvas.toBlob(resolve,"image/jpeg",.82));
+    if (!blob || blob.size>2*1024*1024) throw new Error();
+    return new File([blob],"food-photo.jpg",{type:"image/jpeg"});
+  } finally { bitmap.close(); }
+}
+for (const button of document.querySelectorAll("[data-intake-submit]")) {
+  const form=button.form;
+  let prepared=false;
+  form?.addEventListener("submit",async (event)=>{
+    const photoStatus=form.querySelector("[data-photo-status]");
+    if (photoStatus && !prepared) {
+      event.preventDefault();
+      const inputs=[...form.querySelectorAll('input[name="photos"]')];
+      const files=inputs.flatMap((input)=>[...input.files]);
+      if (files.length<1 || files.length>4) { photoStatus.textContent="请选择 1 至 4 张照片。"; return; }
+      button.disabled=true;
+      photoStatus.textContent="正在准备照片…";
+      try {
+        for (const input of inputs) {
+          const original=[...input.files];
+          if (original.every((file)=>photoTypes.includes(file.type)&&file.size<=2*1024*1024)) continue;
+          const data=new DataTransfer();
+          for (const file of original) data.items.add(await preparePhoto(file));
+          input.files=data.files;
+        }
+        prepared=true;
+        form.requestSubmit();
+      } catch {
+        photoStatus.textContent="照片无法转换。请尝试不超过 2 MB 的 JPEG、PNG 或 WebP。";
+        button.disabled=false;
+      }
+      return;
+    }
+    button.disabled=true;
+    button.textContent="正在提取…";
+  });
+}
