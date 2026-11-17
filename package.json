@@ -1,1 +1,13 @@
-{"name":"lifecycle-hub-sites","private":true,"type":"module","scripts":{"build":"node build.mjs"}}
+{
+  "name": "lifecycle-hub-team",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node build.mjs --test-legacy && node --test smoke.test.mjs",
+    "start": "node start-team.mjs"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

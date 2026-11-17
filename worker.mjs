@@ -235,7 +235,7 @@ export default {
 
 
 async function businessRoute(request, env, url, identity) {
-  const seedDemo = () => env.LOCAL_INSTANCE === true ? undefined : seed(env.DB);
+  const seedDemo = () => env.LOCAL_INSTANCE === true && env.LOCAL_DEMO_SEED !== true ? undefined : seed(env.DB);
   if (url.pathname === "/" && request.method === "GET") {
     await seedDemo();
     await ensureFoodData(env.DB);

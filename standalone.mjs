@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { mkdirSync } from "node:fs";
 import worker from "./dist/server/index.js";
 import { openDemoDatabase } from "./standalone-db.mjs";
 
@@ -14,11 +15,13 @@ if ((publicUrl.protocol !== "https:" && !(loopback && publicUrl.protocol === "ht
   throw new Error("DEMO_PUBLIC_ORIGIN must be an HTTPS origin or a loopback HTTP origin.");
 }
 const host = local ? "127.0.0.1" : process.env.LISTEN_HOST || "127.0.0.1";
-const localPath = join(process.env.LOCALAPPDATA || homedir(), "LifeCycleHub", "data", "personal.sqlite");
-const database = openDemoDatabase(local ? process.env.LIFECYCLE_DB_PATH || localPath : process.env.DEMO_DB_PATH || "./local-data/demo.sqlite");
+const teamData = process.env.LIFECYCLE_TEAM_DATA_DIR || join(process.env.LOCALAPPDATA || homedir(), "LifeCycleHub-Team");
+const localPath = join(teamData, "data", "team.sqlite");
+if (local) mkdirSync(join(teamData, "uploads"), {recursive:true});
+const database = openDemoDatabase(local ? localPath : process.env.DEMO_DB_PATH || "./local-data/demo.sqlite");
 const env = {
   DB: database.DB,
-  ...(local ? {LOCAL_INSTANCE: true} : {DEMO_ACCOUNT_MODE: "enabled"}),
+  ...(local ? {LOCAL_INSTANCE: true, LOCAL_DEMO_SEED: true} : {DEMO_ACCOUNT_MODE: "enabled"}),
   DEMO_PUBLIC_ORIGIN: publicUrl.origin,
   DEMO_INVITATION_HASHES: process.env.DEMO_INVITATION_HASHES || "",
 };
@@ -71,6 +74,7 @@ const server = createServer(async (incoming, outgoing) => {
     const response = await worker.fetch(new Request(url, {method, headers, body}), env);
     const cookies = response.headers.getSetCookie();
     const output = Object.fromEntries(response.headers);
+    if (local) output["x-lifecycle-instance"] = "team-local";
     if (cookies.length) output["set-cookie"] = cookies;
     outgoing.writeHead(response.status, output);
     outgoing.end(Buffer.from(await response.arrayBuffer()));
