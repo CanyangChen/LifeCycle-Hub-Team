@@ -173,7 +173,7 @@ async function demoAuthRoute(request, env, url) {
       return reject("请输入有效的邀请码和至少 12 个字符的密码。", 400);
     }
     const invitationHash = await demoDigest(invitation);
-    if (!(env.DEMO_INVITATION_HASHES || "").split(/\s+/).includes(invitationHash)) {
+    if (![env.DEMO_INVITATION_HASHES, env.DEMO_TEST_INVITATION_HASHES].filter(Boolean).join(" ").split(/\s+/).includes(invitationHash)) {
       return reject("账号创建失败，请核对用户名和邀请码。", 400);
     }
     const account = { id: crypto.randomUUID(), passwordVersion: 1 };

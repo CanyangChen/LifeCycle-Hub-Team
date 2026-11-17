@@ -95,3 +95,10 @@ PORT 可用于指定其他端口，LIFECYCLE_DB_PATH 仅用于选择另一份本
 
 main 为稳定分支。每项任务从 main 创建独立功能分支，完成构建和测试后发起 Pull Request，经组员审核再合并。
 本地 Web 的运行步骤见上文。个人数据库、备份和 API Key 保存在本机。
+
+## 权限回归测试
+
+运行 node build.mjs --test-legacy，然后执行 node --test smoke.test.mjs。
+测试构建会额外生成 test-results/legacy-worker/index.js，仅用于回归。发布前运行 node build.mjs，
+发布入口为 dist/server/index.js。公开演示环境需配置 DEMO_ACCOUNT_MODE=enabled
+及 DEMO_PUBLIC_ORIGIN。邀请码摘要只通过服务端运行配置注入。

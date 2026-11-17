@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import worker, { resolveFoodDates } from "./dist/server/index.js";
+import worker, { resolveFoodDates } from "./test-results/legacy-worker/index.js";
+import hostedDemo from "./dist/server/index.js";
 import { parseQuantity } from "./quantity.mjs";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -932,8 +933,10 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
   sqlite.exec(readFileSync("drizzle/0012_demo_workspace.sql", "utf8"));
   const invite = "test-invitation-0000000000000001";
   const invitationHash = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(invite))).toString("hex");
+  assert.equal((await hostedDemo.fetch(new Request(origin+"/items/food"),{DB})).status,503);
+  assert.equal((await hostedDemo.fetch(new Request(origin+"/items/medicine"),{DB,DEMO_ACCOUNT_MODE:"enabled"})).status,503);
   const demoEnv = { DB, DEMO_ACCOUNT_MODE:"enabled", DEMO_PUBLIC_ORIGIN:origin, DEMO_INVITATION_HASHES:invitationHash };
-  const auth = (path, fields, cookie, source=origin, fetchSite) => worker.fetch(new Request("https://internal-worker.test" + path, {
+  const auth = (path, fields, cookie, source=origin, fetchSite) => hostedDemo.fetch(new Request("https://internal-worker.test" + path, {
     method: fields ? "POST" : "GET", body: fields ? new URLSearchParams(fields) : undefined,
     headers:{origin:source, ...(fetchSite ? {"sec-fetch-site":fetchSite}:{}), ...(cookie ? {cookie}:{}), "oai-authenticated-user-id":"untrusted-for-demo"},
   }),demoEnv);
@@ -981,7 +984,7 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
   }
 
   const secondInvite = "test-invitation-0000000000000002";
-  demoEnv.DEMO_INVITATION_HASHES += " " + Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secondInvite))).toString("hex");
+  demoEnv.DEMO_TEST_INVITATION_HASHES = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secondInvite))).toString("hex");
   const cCourse = cookieOf(await auth("/login",{username:account.username,password:"a different test password"}));
   const cVisitor = cookieOf(await auth("/register",{username:"visitor-check",password,invitation:secondInvite}));
   const [courseHome, visitorHome] = await Promise.all([auth("/",null,cCourse),auth("/",null,cVisitor)]);
@@ -997,11 +1000,17 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
   assert.match(await (await auth(foodPath,null,cCourse)).text(),/账号一独立果汁/);
   assert.equal((await auth(foodPath,null,cVisitor)).status,404);
   assert.equal((await auth(foodPath,{operation:"delete"},cVisitor)).status,404);
+  assert.equal((await auth(foodPath+"/edit",{remainingAmount:"0"},cVisitor)).status,404);
+  const visitorFood=await createScoped("/items/food/new",{name:"账号二独立果汁",purchasedAmount:"1",unit:"瓶"},cVisitor);
+  assert.equal((await auth(visitorFood,null,cVisitor)).status,200);
+  assert.equal((await auth(visitorFood,null,cCourse)).status,404);
   assert.doesNotMatch(await (await auth("/",null,cVisitor)).text(),/账号一独立果汁/);
   assert.doesNotMatch(await (await auth("/items/food",null,cVisitor)).text(),/账号一独立果汁/);
   const medicinePath=await createScoped("/items/medicine/new",{drugId:"new",name:"账号一独立药品",purchasedAmount:"5",unit:"片"},cCourse);
   assert.equal((await auth(medicinePath,null,cCourse)).status,200);
   assert.equal((await auth(medicinePath,null,cVisitor)).status,404);
+  assert.equal((await auth(medicinePath,{operation:"delete"},cVisitor)).status,404);
+  assert.equal((await auth(medicinePath+"/edit",{remainingAmount:"0"},cVisitor)).status,404);
   for (const type of ["clothing","device","subscription"]) {
     const path=await createScoped("/items/"+type+"/new",{name:"账号一独立档案"},cCourse);
     assert.equal((await auth(path,null,cCourse)).status,200);

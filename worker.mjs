@@ -221,6 +221,9 @@ export default {
         headers.set("oai-authenticated-user-id", "local-device");
         return await businessRoute(new Request(request, {headers}), env, url, "local-device");
       }
+      if (requireDemoAuth && (env.DEMO_ACCOUNT_MODE !== "enabled" || !env.DEMO_PUBLIC_ORIGIN)) {
+        return new Response("演示站登录暂不可用", {status:503, headers:{"cache-control":"no-store"}});
+      }
       if (env.DEMO_ACCOUNT_MODE === "enabled") return await demoAuthRoute(request, env, url);
       return await businessRoute(request, env, url, request.headers.get("oai-authenticated-user-id"));
     } catch (error) {
