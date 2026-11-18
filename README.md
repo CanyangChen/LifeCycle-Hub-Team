@@ -38,3 +38,40 @@ ChatGPT、邀请码或网络连接。文字规则提取和手动录入可离线�
 main 为稳定分支。每项任务使用功能分支，测试通过后发起 Pull Request。
 运行 node build.mjs 构建，运行 npm test 执行冒烟和权限回归。
 也可用 node build.mjs --test-legacy 和 node --test smoke.test.mjs 分步执行。
+
+## 课堂演示操作
+
+1. 打开「食品」→「快速记录」，输入「刚才买了两桶方便面，放在柜子里了」。核对名称、2 桶和厨房储物柜，再确认保存。
+2. 在食品批次详情修改数量或记录消耗，刷新确认已保存。再退出服务并重新启动，确认记录仍在。
+3. 到「药品」新建虚构档案和批次，登记一次实际服用，检查库存扣减及服用历史。
+4. 衣物、电子设备和会员订阅可分别新建、编辑或删除虚构档案。
+
+如需演练而不影响日常库存，先关闭正在运行的团队版，然后在 PowerShell 中执行：
+
+```powershell
+$env:LIFECYCLE_TEAM_DATA_DIR = Join-Path $env:LOCALAPPDATA 'LifeCycleHub-Team-Test'
+$env:PORT = '8090'
+.\start-local.cmd
+```
+
+打开 http://127.0.0.1:8090/。测试库会自动初始化。关闭该 PowerShell 后，常规启动仍使用默认目录。
+
+## 测试账号汇总
+
+| 环境 | 测试身份 | 使用方法 |
+|---|---|---|
+| 团队本地 Web | 无需账号 | 每位组员直接启动。使用各自机器和 Windows 用户目录中的数据。 |
+| 独立测试库 | 无需账号 | 使用上面的测试目录和独立端口，验证初始化、写入、重启和恢复。 |
+| 线上课程演示站 | course_test_a / course_test_b | 这是预留的验收用户名。首次使用由负责人私下提供各自的一次性邀请码，测试人员自行设置密码。若尚未开户，用户名无法直接登录。 |
+| 自动化回归 | course-check / visitor-check，drug-smoke-a / drug-smoke-b | 测试脚本在内存 SQLite 中创建的虚构身份，供隔离测试使用。 |
+
+两位线上测试人员可分别创建虚构食品批次，刷新页面确认自己的记录保留，再尝试打开另一位的批次链接，确认无法查看。线上入口受托管平台网络可用性影响，课堂首选团队本地版。个人站账号不用于团队验收。
+
+## 更多说明
+
+- [团队贡献规范](CONTRIBUTING.md)
+- [开发环境](docs/development-guide.md)
+- [项目架构](docs/architecture.md)
+- [数据库与恢复](docs/database-design.md)
+- [测试与验收](docs/testing-guide.md)
+- [版本更新](CHANGELOG.md)
