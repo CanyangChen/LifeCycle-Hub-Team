@@ -31,7 +31,7 @@ function intakeLocation(line,locations) {
   if (explicit) return explicit.id;
   if (line.includes("冷冻")) return locations.find((r)=>r.id==="freezer")?.id || "";
   if (line.includes("冷藏")) return locations.find((r)=>r.id==="fridge")?.id || "";
-  if (/(?:放在|放进|放入|放到|储存在)\s*(?:厨房(?:的)?)?(?:柜子|储物柜)(?:里|内|中)?(?:了|[，,。；;]|$)/.test(line)) {
+  if (/(?:放在|放进|放入|放到|放|储存在)\s*(?:厨房(?:的)?)?(?:柜子|储物柜)(?:里|内|中)?(?:了|[，,。；;]|$)/.test(line)) {
     return locations.find((r)=>r.id==="cupboard")?.id || "";
   }
   return "";
@@ -39,7 +39,7 @@ function intakeLocation(line,locations) {
 function intakeRuleRows(text,locations,clock) {
   const rows=foodTextCandidates(text,locations,clock.day).map((row)=>{
     const line=row.source;
-    const isPurchase=foodPurchaseLead.test(line);
+    const isPurchase=foodPurchaseLead.test(intakeCleanSpeech(line));
     const count=line.match(/(?:改成|改为|减少|吃了|喝了)\s*([\d.]+|[一二两三四五六七八九十]+)\s*(千克|公斤|毫升|斤|克|升|个|盒|袋|瓶|罐)/);
     const amount=count?(/^[0-9]/.test(count[1])?Number(count[1]):numberOf(count[1])):row.amount;
     const place=intakeLocation(line,locations);

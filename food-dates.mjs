@@ -40,11 +40,19 @@ export function resolveFoodDates(text, day) {
       add(`${year||day.slice(0,4)}-${month.padStart(2,"0")}-${date.padStart(2,"0")}`,year?"stated":"year-confirm",match[0]);
     }
   }
+  const useBy = [...source.matchAll(new RegExp("("+count+")\\s*(?:天|日)(?:之)?内\\s*(?:要|得|需要|尽量|记得)?\\s*(?:吃完|喝完|用完|食用完)|(?:一周|一个星期)(?:之)?内\\s*(?:吃完|喝完|用完)", "g"))];
+  if (!dates.length) {
+    for (const match of useBy) {
+      const days = match[1] ? readCount(match[1]) : 7;
+      add(validDays(days)?foodAddDays(day,days):"", "consume-by", match[0]);
+    }
+  }
   const uniques=[...new Set(dates.map((entry)=>entry.value))];
   const production=source.match(new RegExp(`(?:生产(?:日期|日)?)(?:为|是|[:：])?\\s*${datePattern}(?![0-9])`));
   const producedOn=production?.[1]?`${production[1]}-${production[2].padStart(2,"0")}-${production[3].padStart(2,"0")}`:"";
   const resolved=uniques.length===1&&uniques[0]?dates[0]:null;
   const notes=[];
+  if (useBy.length) notes.push("已识别用户要求的食用期限；这是消耗截止提醒，请核对包装到期日期。");
   if (dates.length&&!resolved) notes.push("到期日期无效或相互冲突，请确认。");
   if (!dates.length&&/到期|过期|有效期至/.test(source)) notes.push("到期日期尚未明确，请确认。");
   if (resolved?.kind==="year-confirm") notes.push(`原文没有指定年份，已按录入地的 ${day.slice(0,4)} 年预填，请核对年份。`);

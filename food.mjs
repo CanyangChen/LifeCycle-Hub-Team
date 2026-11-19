@@ -1,3 +1,4 @@
+const intakeCleanSpeech = (text) => String(text ?? "").normalize("NFKC").trim().replace(/^(?:帮我记一下|帮我记录|记一下|记录)(?:一下)?\s*[:：]?\s*/, "");
 const foodRoot = "/items/food";
 const foodSubtypes = {
   produce: ["新鲜蔬菜水果", "叶菜类", "根茎类", "瓜果类", "浆果类", "其他水果"],
@@ -666,11 +667,11 @@ async function foodUpdateBatch(db,row,form,intake=null) {
   return foodRedirect(back+"?saved=1");
 }
 
-const foodPurchaseLead = /^我?\s*(?:(?:今天|昨天|前天)\s*)?(?:刚刚|刚才|刚)?\s*(?:购买了?|买了?|购入了?|添了)/;
+const foodPurchaseLead = /^我?\s*(?:(?:今天|昨天|前天)\s*)?(?:刚刚|刚才|刚|刚买回来|又)?\s*(?:购买了?|买了?|购入了?|添了)/;
 const foodQuantityUnit = "千克|公斤|毫升|斤|克|升|个|颗|盒|袋|瓶|罐|桶|箱|包|片";
 function foodTextCandidates(text, locations, today) {
   const offset = {今天:0, 昨天:-1, 前天:-2};
-  return text.split(/[\n；;。]|和(?=[0-9一二两三四五六七八九十])/).map((v)=>v.trim()).filter(Boolean).slice(0,8).map((line) => {
+  return intakeCleanSpeech(text).split(/[\n；;。]|和(?=[0-9一二两三四五六七八九十])/).map((v)=>v.trim()).filter(Boolean).slice(0,8).map((line) => {
     const where = [...locations].sort((a,b)=>b.name.length-a.name.length).find((loc)=>line.includes(loc.name));
     const relative = Object.keys(offset).find((word)=>line.includes(word));
     const purchase = relative ? foodAddDays(today,offset[relative]) : "";

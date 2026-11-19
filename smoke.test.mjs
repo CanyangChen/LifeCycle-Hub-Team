@@ -1124,3 +1124,75 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,"day");
  console.log("Wardrobe intake passed: natural text extraction, editable review without writes, date/month picker save.");
 }
+
+{
+ const day="2026-11-19";
+ for(const [text,expected] of [
+  ["记得3天内吃完","2026-11-22"],["两天之内喝完","2026-11-21"],
+  ["一周内吃完","2026-11-26"],["一个星期内用完","2026-11-26"],
+  ["十天后到期","2026-11-29"],["明天到期","2026-11-20"],
+  ["保质期10天",""],["两天内吃完，三天内吃完",""],
+ ]){
+  assert.equal(resolveFoodDates(text,day).expiresOn,expected,text);
+ }
+ const review=await post("/items/food/intake",{method:"text",timeZone:"Asia/Shanghai",text:"记录：今天买了两斤饺子，放冰箱了，记得3天内吃完。"});
+ assert.equal(review.status,200);
+ const page=await review.text();
+ assert.match(page,/name="candidate-0-name"[^>]*value="饺子"/);
+ assert.match(page,/name="candidate-0-purchasedAmount"[^>]*value="2"/);
+ assert.match(page,/name="candidate-0-unit"[^>]*value="斤"/);
+ assert.match(page,new RegExp('name="candidate-0-expiresOn"[^>]*value="'+relative(3)+'"'));
+ assert.match(page,/用户要求的食用期限/);
+ assert.match(page,/请确认储存位置/);
+ for(const [text,name,unit] of [
+   ["帮我记一下：刚才买了两桶方便面，放柜子里了","方便面","桶"],
+   ["记录 今天买了三盒酸奶，放冷藏了，明天到期","酸奶","盒"],
+   ["记一下：昨天买了一袋大米，保质期10天","大米","袋"],
+ ]){
+  const r=await post("/items/food/intake",{method:"text",text,timeZone:"Asia/Shanghai"});
+  assert.equal(r.status,200);
+  const html=await r.text();
+  assert.ok(html.includes('value="'+name+'"'),text);
+  assert.ok(html.includes('value="'+unit+'"'),text);
+ }
+ const clothing=await post("/items/clothing/intake",{text:"帮我记录：两年前入手了一件羊毛外套，总共399元，不怎么穿，收在衣柜里。"});
+ assert.equal(clothing.status,200);
+ const card=await clothing.text();
+ assert.match(card,/value="羊毛外套"/);
+ assert.match(card,/value="399"/);
+ assert.match(card,/很少穿/);
+ console.log("Colloquial food and wardrobe passed: prefixes, use-by deadlines, duration ambiguity, units, locations, purchase synonyms and frequency.");
+}
+
+{
+ for(const text of [
+   "记录：刚才买了一盒感冒灵颗粒，12包，每天三次，每次一包，饭后服用",
+   "帮我记一下：今天买了一盒测试药片，24片，每日两次，每次一片",
+   "记一下：昨天买了两盒测试胶囊，每盒12粒",
+ ]){
+  const response=await worker.fetch(new Request(origin+"/items/medicine/intake",{method:"POST",
+    headers:{origin,"oai-authenticated-user-id":"drug-speech-audit"},
+    body:new URLSearchParams({method:"text",text,timeZone:"Asia/Shanghai"})}),{DB});
+  assert.equal(response.status,200,text);
+  const html=await response.text();
+  assert.match(html,/name="name"/);
+  assert.doesNotMatch(html,/value="记录|value="帮我记|value="记一下/);
+  if(text.includes("感冒灵"))assert.match(html,/value="感冒灵颗粒"/);
+ }
+ console.log("Colloquial medication passed: dictation prefixes, just-purchased batches, package quantities and dosage instructions.");
+}
+
+{
+ const review=await post("/items/food/intake",{method:"text",timeZone:"Asia/Shanghai",text:"记录：今天买了两斤饺子，放冰箱了，记得3天内吃完。"});
+ const text=await review.text(),draft=idOfDraft(text);
+ const response=await post("/items/food/intake",{operation:"confirm",draft,
+  "candidate-0-foodId":"new","candidate-0-name":"口语验收饺子","candidate-0-purchasedAmount":"2",
+  "candidate-0-unit":"斤","candidate-0-locationId":"fridge","candidate-0-expiresOn":relative(3)});
+ assert.equal(response.status,303);
+ const row=sqlite.prepare("SELECT f.*,i.id FROM FoodDetail f JOIN Item i ON i.id=f.itemId WHERE i.name='口语验收饺子'").get();
+ assert.equal(row.expiresOn,relative(3));
+ assert.equal(row.stockUnit,"斤");
+ assert.match(await html("/items/food"),/口语验收饺子/);
+ assert.match(await html("/items/food/"+row.id),new RegExp(relative(3)));
+ console.log("Use-by deadline persisted with batch and appears in inventory and detail after confirmation.");
+}
