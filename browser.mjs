@@ -152,3 +152,6 @@ for (const button of document.querySelectorAll("[data-intake-submit]")) {
     button.textContent="正在提取…";
   });
 }
+
+const wardrobeFilters = document.querySelector("[data-wardrobe-filters]");
+wardrobeFilters?.addEventListener("change", () => wardrobeFilters.requestSubmit());

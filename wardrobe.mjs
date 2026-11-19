@@ -5,7 +5,7 @@ const wardrobeTags = {
   care:["可机洗","轻柔手洗","需要干洗","阴干","低温熨烫","不可漂白"],
 };
 const wardrobeSplit = (value) => [...new Set(String(value || "").split(/[,，、]/).map(s => s.trim()).filter(Boolean))];
-function wardrobeDate(raw, reference) {
+function wardrobeDate(raw, reference, confirmedYear = "") {
   const text = raw.trim().normalize("NFKC");
   if (!text) return null;
   const result = (value, precision, estimated = false) => ({raw:raw.trim(),value,precision,estimated,reference});
@@ -30,6 +30,10 @@ function wardrobeDate(raw, reference) {
     return result(year[1],"year");
   }
   if (month || year) throw Error("购买时间格式无效");
+  if (confirmedYear) {
+    if (!/^\d{4}$/.test(confirmedYear) || Number(confirmedYear) < 1 || confirmedYear > reference.slice(0,4)) throw Error("请确认有效的购买年份");
+    return result(confirmedYear,"year",true);
+  }
   const numbers = {一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10};
   const count = value => /^\d/.test(value) ? Number(value) : numbers[value];
   const relative = clean.replace(/^买了/, "").match(/^([一二两三四五六七八九十\d]+)(年半|年|个月|月)(?:前)?$/);
@@ -80,6 +84,7 @@ async function wardrobeRoute(request,db,url) {
       (message?'<p role="alert">'+escape(message)+'</p>':"")+
       (item.id?'<p>'+escape(wardrobeAge(data.purchase))+'</p>':"")+
       '<form method="post" class="panel editor"><fieldset>'+input("name","名称",item.name)+input("purchase","购买时间（日期、年月、年份或两年前）",data.purchase?.raw)+
+      input("confirmedYear","模糊时间可在这里确认大致年份（可选）",data.purchase?.estimated && data.purchase.precision==="year" ? data.purchase.value : "")+
       Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : input(key,label,data[key])).join("")+
       input("minTemp","最低适用温度 °C",data.minTemp,"number")+input("maxTemp","最高适用温度 °C",data.maxTemp,"number")+
       '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><button class="button">保存档案</button></form>'+
@@ -102,7 +107,7 @@ async function wardrobeRoute(request,db,url) {
     try{
       if (data.price && !/^\d{1,7}(?:\.\d{1,2})?$/.test(data.price)) throw Error("购买价格应为非负金额，最多两位小数");
       const prior=row?wardrobeData(row):{};
-      data.purchase=prior.purchase?.raw===get("purchase")?prior.purchase:wardrobeDate(get("purchase"),intakeClock(Intl.DateTimeFormat().resolvedOptions().timeZone).day);
+      data.purchase=prior.purchase?.raw===get("purchase") && (!get("confirmedYear") || get("confirmedYear")===prior.purchase.value)?prior.purchase:wardrobeDate(get("purchase"),intakeClock(Intl.DateTimeFormat().resolvedOptions().timeZone).day,get("confirmedYear"));
       for(const key of ["minTemp","maxTemp"]) {
         data[key]=get(key)===""?null:Number(get(key));
         if(data[key]!==null&&(!Number.isFinite(data[key])||data[key]<-100||data[key]>100))throw Error("温度应在 -100 至 100 之间");
@@ -123,13 +128,13 @@ async function wardrobeRoute(request,db,url) {
   const rows=all.filter(r=>{
     if(Boolean(r.archivedAt)!==archived||!r.name.toLowerCase().includes(q.toLowerCase()))return false;
     const d=wardrobeData(r);
-    return ["kind","material","frequency","weather","care"].every(k=>!url.searchParams.get(k)||String(d[k]||"").split(/[,，、]/).map(s=>s.trim()).includes(url.searchParams.get(k)))&&
+    return ["kind","material","frequency","weather","care"].every(k=>!url.searchParams.get(k)||wardrobeSplit(url.searchParams.get(k)).every(tag=>wardrobeSplit(d[k]).includes(tag)))&&
       (!url.searchParams.get("temperature") || (d.minTemp!=null||d.maxTemp!=null)&&Number(url.searchParams.get("temperature"))>=(d.minTemp??-Infinity)&&Number(url.searchParams.get("temperature"))<=(d.maxTemp??Infinity));
   });
   if(url.searchParams.get("sort")==="purchase")rows.sort((a,b)=>(wardrobeData(b).purchase?.value||"").localeCompare(wardrobeData(a).purchase?.value||""));
   else rows.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
   return render(hero("我的衣橱","衣物、购买时长与洗护标签",link(root+"/new","新增衣物","button"))+
-    '<form class="panel editor"><fieldset>'+input("q","名称搜索",q)+["kind","material","frequency","weather","care"].map(k=>input(k,wardrobeFields[k],url.searchParams.get(k))).join("")+input("temperature","适用温度 °C",url.searchParams.get("temperature"),"number")+
+    '<form class="panel editor" data-wardrobe-filters><fieldset>'+input("q","名称搜索",q)+["kind","material","frequency","weather","care"].map(k=>input(k,wardrobeFields[k],url.searchParams.get(k))).join("")+input("temperature","适用温度 °C",url.searchParams.get("temperature"),"number")+
     '<label>状态<select name="status"><option value="active">在用</option><option value="archived" '+(archived?"selected":"")+'>已归档</option></select></label><label>排序<select name="sort"><option value="updated">最近更新</option><option value="purchase" '+(url.searchParams.get("sort")==="purchase"?"selected":"")+'>购买时间</option></select></label></fieldset><button class="button">筛选</button></form>'+
     '<div class="intake-grid">'+rows.map(r=>{const d=wardrobeData(r);return link(root+"/"+r.id,'<span aria-label="衣物占位图">◇</span><h2>'+escape(r.name)+'</h2><p>'+escape(wardrobeAge(d.purchase))+'</p><p>'+escape([d.kind,d.material,d.frequency,d.care].filter(Boolean).join(" · "))+'</p><p>温度 '+escape(d.minTemp??"未标记")+" ～ "+escape(d.maxTemp??"未标记")+' °C · '+escape(d.weather||"天气未标记")+'</p>',"panel");}).join("")+(rows.length ? "" : '<p class="empty">暂无匹配衣物。</p>')+'</div>');
 }

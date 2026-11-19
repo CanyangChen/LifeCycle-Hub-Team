@@ -1083,3 +1083,18 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.deepEqual(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase,parsed.purchase);
  console.log("Wardrobe compatibility passed: legacy dates, explicit clearing, multiselect, invalid dates and stable reference.");
 }
+
+{
+ const response=await post("/items/clothing/new",{name:"节日购买验收",purchase:"前几年春节买的",confirmedYear:"2022",material:"棉，羊毛"});
+ assert.equal(response.status,303);
+ const path=response.headers.get("location").split("?")[0],id=path.split("/").at(-1);
+ const data=JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe);
+ assert.equal(data.purchase.raw,"前几年春节买的");
+ assert.equal(data.purchase.value,"2022");
+ assert.equal(data.purchase.precision,"year");
+ assert.equal(data.purchase.estimated,true);
+ assert.equal((await post(path,{name:"节日购买验收",purchase:"前几年春节买的",confirmedYear:"2099"})).status,400);
+ assert.match(await html("/items/clothing?material="+encodeURIComponent("棉，羊毛")),/节日购买验收/);
+ assert.doesNotMatch(await html("/items/clothing?material="+encodeURIComponent("棉，真丝")),/节日购买验收/);
+ console.log("Wardrobe confirmation passed: ambiguous time keeps original text and confirmed year; combined tags require all selections.");
+}
