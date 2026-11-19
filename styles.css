@@ -129,3 +129,7 @@ input, select, textarea { background: #fff; color: var(--ink); border: 1px solid
   .wardrobe-create { width: 100%; }
   .wardrobe-grid, .wardrobe-filter-grid { grid-template-columns: 1fr; }
 }
+
+.wardrobe-time { border:1px solid var(--line) !important; padding:18px !important; border-radius:12px; background:#f5f8f2; }
+.wardrobe-time legend { font-size:18px; font-weight:650; }
+.wardrobe-editor textarea { width:100%; margin:10px 0; }

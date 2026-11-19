@@ -17,7 +17,7 @@ const journal = JSON.parse(await read("./drizzle/meta/_journal.json"));
 const demoMigrations = await Promise.all(journal.entries.filter(({tag}) => !/_demo_/.test(tag)).map(async ({tag}) =>
   (await read("./drizzle/" + tag + ".sql")).split("--> statement-breakpoint").map((sql) => sql.trim()).filter(Boolean)));
 const demoWorkspaces = "const demoMigrations = " + JSON.stringify(demoMigrations) + ";\n" + await read("./demo-workspace.mjs");
-const wardrobe = await read("./wardrobe.mjs");
+const wardrobe = await read("./wardrobe.mjs") + "\n" + await read("./wardrobe-intake.mjs");
 const worker = (await read("./worker.mjs"))
   .replace('import { catalog, styles, browser } from "./generated.mjs";', () => generated + "const requireDemoAuth = " + requireDemoAuth + ";\n")
   .replace('import { parseQuantity } from "./quantity.mjs";', () => quantity)
