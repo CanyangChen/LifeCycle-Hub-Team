@@ -190,3 +190,20 @@ document.querySelectorAll("[data-food-expiry-mode]").forEach(select => {
   form.elements.namedItem(prefix+"shelfLifeDays")?.addEventListener("input",update);
   update();
 });
+
+document.querySelectorAll("[data-food-open-state]").forEach(select => {
+  const input = select.form.querySelector("[data-food-open-date]");
+  if (!input) return;
+  const update = () => {
+    const opened = select.value === "opened";
+    input.closest("label").hidden = !opened;
+    input.disabled = !opened;
+    input.required = opened;
+    if (opened && !input.value) {
+      const now = new Date();
+      input.value = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    }
+  };
+  select.addEventListener("change",update);
+  update();
+});

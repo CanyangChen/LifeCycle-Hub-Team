@@ -1219,3 +1219,24 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.match(await review.text(),/name="candidate-0-expiresOn"[^>]*value="2026-11-11"/);
  console.log("Food date modes passed: production-based calculation, missing production rejected, direct date switch, and intake calculation.");
 }
+
+{
+ const created=await post(base+"/new",{foodId:"new",name:"开封简化验收",purchasedAmount:"2",unit:"盒",locationId:"cupboard",openedState:"opened",timeZone:"Asia/Shanghai"});
+ assert.equal(created.status,303);
+ const path=created.headers.get("location").split("?")[0],id=path.split("/").at(-1);
+ let row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.packaging,"opened");
+ assert.equal(row.openedOn,relative(0));
+ const rules=sqlite.prepare("SELECT count(*) n FROM ReminderRule WHERE itemId=?").get(id).n;
+ const edit=await html(path+"/edit");
+ assert.match(edit,/是否开封/);
+ assert.doesNotMatch(edit,/name="frozenOn"|冷冻日期/);
+ assert.equal((await post(path+"/edit",{openedState:"opened",openedOn:relative(-1)})).status,303);
+ assert.equal(sqlite.prepare("SELECT openedOn FROM FoodDetail WHERE itemId=?").get(id).openedOn,relative(-1));
+ assert.equal((await post(path+"/edit",{openedState:"sealed"})).status,303);
+ row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.openedOn,null);
+ assert.equal(row.packaging,"sealed");
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM ReminderRule WHERE itemId=?").get(id).n,rules);
+ console.log("Food opening selector passed: today default, editable date, sealed reset, frozen date removed, no extra reminder.");
+}
