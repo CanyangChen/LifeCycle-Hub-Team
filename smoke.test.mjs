@@ -1056,3 +1056,30 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.match(await html(root),/衣橱验收外套/);
  console.log("Wardrobe passed: date precision, relative dates, filtering, temperature validation, archive and restore.");
 }
+
+{
+ const created=await post("/items/clothing/new",{name:"旧精度验证衣物",purchasedOn:"2023-05-01",material:"棉"});
+ assert.equal(created.status,303);
+ const path=created.headers.get("location");
+ const id=path.split("?")[0].split("/").at(-1);
+ sqlite.prepare("UPDATE ClothingDetail SET wardrobe=NULL,purchasedOn='2023-05-01' WHERE itemId=?").run(id);
+ assert.match(await html(path),/2023-05-01/);
+ const multi=new URLSearchParams({name:"旧精度验证衣物",purchase:"2023-05-01",weatherCustom:"雾天"});
+ multi.append("material","棉");multi.append("material","羊毛");
+ assert.equal((await post(path,multi)).status,303);
+ assert.match(await html(path),/name="material" value="羊毛" checked/);
+ assert.equal((await post(path,{name:"旧精度验证衣物",purchase:""})).status,303);
+ assert.match(await html(path),/购买时间未填写/);
+ assert.equal(sqlite.prepare("SELECT purchasedOn FROM ClothingDetail WHERE itemId=?").get(id).purchasedOn,null);
+ for(const purchase of ["2024-02-30","0000年","2099年","前几年买的","2024年13月"]){
+  assert.equal((await post(path,{name:"旧精度验证衣物",purchase})).status,400,purchase);
+ }
+ for(const purchase of ["2024年5月购买","2023年购入","买了两年","2024-05-15"]){
+  assert.equal((await post(path,{name:"旧精度验证衣物",purchase})).status,303,purchase);
+ }
+ const before=sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe;
+ const parsed=JSON.parse(before);
+ assert.equal((await post(path,{name:"修改其他字段",purchase:parsed.purchase.raw})).status,303);
+ assert.deepEqual(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase,parsed.purchase);
+ console.log("Wardrobe compatibility passed: legacy dates, explicit clearing, multiselect, invalid dates and stable reference.");
+}
