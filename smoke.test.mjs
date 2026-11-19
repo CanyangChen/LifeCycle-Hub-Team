@@ -17,6 +17,7 @@ sqlite.exec(readFileSync("drizzle/0007_drug_m2.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0008_drug_m3.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0009_food_portions.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0010_record_deletion.sql", "utf8"));
+sqlite.exec(readFileSync("drizzle/0013_wardrobe.sql", "utf8"));
 function statement(sql, params = []) {
   return {
     bind: (...values) => statement(sql, values),
@@ -1030,4 +1031,28 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
   assert.deepEqual(sqlite.prepare("PRAGMA foreign_key_check").all(),[]);
   console.log("Demo workspaces passed: both accounts seeded, five modules isolated, cross-account deletion and draft confirmation rejected.");
   console.log("Demo account authentication passed: invite reuse, origin, route gate, two sessions, password change, logout, and rate limit.");
+}
+
+{
+ const root="/items/clothing";
+ const response=await post(root+"/new",{name:"衣橱验收外套",purchase:"两年前买的",material:"棉，羊毛",frequency:"经常穿",weather:"晴天",care:"不可漂白",minTemp:"5",maxTemp:"20"});
+ assert.equal(response.status,303);
+ const path=response.headers.get("location").split("?")[0];
+ const id=path.split("/").at(-1);
+ const saved=JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe);
+ assert.equal(saved.purchase.precision,"estimate");
+ assert.equal(saved.purchase.estimated,true);
+ assert.match(await html(root+"?material="+encodeURIComponent("羊毛")) ,/衣橱验收外套/);
+ assert.doesNotMatch(await html(root+"?temperature=30"),/衣橱验收外套/);
+ const edit=await post(path,{name:"衣橱验收外套",purchase:"两年前买的",material:"棉",minTemp:"10",maxTemp:"5"});
+ assert.equal(edit.status,400);
+ assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).minTemp,5);
+ for(const [value,precision] of [["2024年5月","month"],["2023年","year"],["2024年5月15日","day"],["一年半前","estimate"],["两三年前买的","estimate"]]){
+   assert.equal((await post(path,{name:"衣橱验收外套",purchase:value})).status,303);
+   assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,precision);
+ }
+ assert.equal((await post(path,{operation:"archive"})).status,303);
+ assert.equal((await post(path,{operation:"restore"})).status,303);
+ assert.match(await html(root),/衣橱验收外套/);
+ console.log("Wardrobe passed: date precision, relative dates, filtering, temperature validation, archive and restore.");
 }
