@@ -302,8 +302,8 @@ assert.match(resolveFoodDates("11月26日过期","2026-11-16").dateEvidence,/核
 assert.equal(resolveFoodDates("明天到期","2026-12-31").expiresOn,"2027-01-01");
 const duration=resolveFoodDates("保质期10天","2026-11-16");
 assert.equal(duration.shelfLifeDays,10);
-assert.equal(duration.shelfLifeBase,"");
-assert.match(duration.dateEvidence,/从生产日还是购买日/);
+assert.equal(duration.shelfLifeBase,"production");
+assert.match(duration.dateEvidence,/补充生产日期/);
 assert.equal(resolveFoodDates("生产日期2026年11月5日，保质期十天，从生产日起","2026-11-16").producedOn,"2026-11-05");
 const instantNoodles = await post(base+"/intake",{method:"text",text:"刚才买了两桶方便面，放在柜子里了",timeZone:"Asia/Shanghai"});
 assert.equal(instantNoodles.status,200);
@@ -1142,7 +1142,7 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.match(page,/name="candidate-0-purchasedAmount"[^>]*value="2"/);
  assert.match(page,/name="candidate-0-unit"[^>]*value="斤"/);
  assert.match(page,new RegExp('name="candidate-0-expiresOn"[^>]*value="'+relative(3)+'"'));
- assert.match(page,/用户要求的食用期限/);
+ assert.match(page,/按用户描述计算到期日期/);
  assert.match(page,/请确认储存位置/);
  for(const [text,name,unit] of [
    ["帮我记一下：刚才买了两桶方便面，放柜子里了","方便面","桶"],
@@ -1195,4 +1195,27 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.match(await html("/items/food"),/口语验收饺子/);
  assert.match(await html("/items/food/"+row.id),new RegExp(relative(3)));
  console.log("Use-by deadline persisted with batch and appears in inventory and detail after confirmation.");
+}
+
+{
+ const fields={foodId:"new",name:"生产日计算验收",purchasedAmount:"1",unit:"袋",locationId:"cupboard",
+  expiryMode:"duration",shelfLifeDays:"10",producedOn:"2026-11-01"};
+ assert.equal((await post(base+"/new",{...fields,producedOn:""})).status,400);
+ const saved=await post(base+"/new",fields);
+ assert.equal(saved.status,303);
+ const path=saved.headers.get("location").split("?")[0];
+ const id=path.split("/").at(-1);
+ let row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.expiresOn,"2026-11-11");
+ assert.equal(row.shelfLifeBase,"production");
+ assert.doesNotMatch(await html(path+"/edit"),/保质期计算起点/);
+ assert.equal((await post(path+"/edit",{expiryMode:"date",expiresOn:"2026-12-01"})).status,303);
+ row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.expiresOn,"2026-12-01");
+ assert.equal(row.shelfLifeBase,null);
+ assert.equal(row.shelfLifeDays,null);
+ const review=await post(base+"/intake",{method:"text",text:"买了一袋面粉，生产日期2026年11月1日，保质期10天",timeZone:"Asia/Shanghai"});
+ assert.equal(review.status,200);
+ assert.match(await review.text(),/name="candidate-0-expiresOn"[^>]*value="2026-11-11"/);
+ console.log("Food date modes passed: production-based calculation, missing production rejected, direct date switch, and intake calculation.");
 }

@@ -156,3 +156,37 @@ for (const button of document.querySelectorAll("[data-intake-submit]")) {
 const wardrobeFilters = document.querySelector("[data-wardrobe-filters]");
 wardrobeFilters?.addEventListener("change", () => wardrobeFilters.requestSubmit());
 
+
+document.querySelectorAll("[data-food-expiry-mode]").forEach(select => {
+  const prefix = select.name.slice(0, -"expiryMode".length);
+  const form = select.form;
+  const preview = document.createElement("p");
+  preview.className = "food-muted";
+  preview.setAttribute("role","status");
+  select.closest("label").after(preview);
+  const update = () => {
+    for (const [field, visible] of [["expiresOn",select.value==="date"],["shelfLifeDays",select.value==="duration"]]) {
+      const input = form.elements.namedItem(prefix+field);
+      if (!input || input instanceof RadioNodeList) continue;
+      input.closest("label").hidden = !visible;
+      input.disabled = !visible;
+      input.required = visible && field==="shelfLifeDays";
+    }
+    const production = form.elements.namedItem(prefix+"producedOn");
+    if (production && !(production instanceof RadioNodeList)) production.required = select.value==="duration";
+    const days=form.elements.namedItem(prefix+"shelfLifeDays");
+    preview.textContent="";
+    if(select.value==="duration"){
+      const date=new Date(production?.value+"T12:00:00Z");
+      const count=Number(days?.value);
+      if(Number.isFinite(date.getTime()) && Number.isInteger(count) && count>0 && count<=36500){
+        date.setUTCDate(date.getUTCDate()+count);
+        preview.textContent="计算到期日期："+date.toISOString().slice(0,10);
+      }else preview.textContent="填写生产日期和保质期后自动计算到期日期。";
+    }
+  };
+  select.addEventListener("change",update);
+  form.elements.namedItem(prefix+"producedOn")?.addEventListener("input",update);
+  form.elements.namedItem(prefix+"shelfLifeDays")?.addEventListener("input",update);
+  update();
+});

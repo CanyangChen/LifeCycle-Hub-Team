@@ -219,8 +219,9 @@ const foodFields = (form, specification, editing = false, source = "label") => {
   const dates = ["purchasedOn","producedOn","expiresOn","openedOn","frozenOn"];
   const expiryLead = get("expiryLead") === "" ? null : Number(get("expiryLead"));
   const checkDays = get("checkDays") === "" ? null : Number(get("checkDays"));
-  const shelfLifeDays = get("shelfLifeDays")==="" ? null : Number(get("shelfLifeDays"));
-  const shelfLifeBase = get("shelfLifeBase");
+  const shelfLifeDays = get("expiryMode")==="date" || get("shelfLifeDays")==="" ? null : Number(get("shelfLifeDays"));
+  const mode = get("expiryMode");
+  const shelfLifeBase = mode === "duration" ? "production" : mode === "date" ? "" : get("shelfLifeBase");
   const baseDate = shelfLifeBase==="production" ? get("producedOn") : get("purchasedOn");
   const validAmount = (v) => v == null || (Number.isFinite(v) && v >= 0 && v <= 1000000);
   if (dates.some((key) => get(key) && !foodDate(get(key))) ||
@@ -256,10 +257,10 @@ const foodNumberAttrs = 'type="number" step="any" min="0" max="1000000"';
 const foodUnitInput = (name,value) => foodInput(name,"数量单位",value,'list="food-units" maxlength="20"') +
   `<datalist id="food-units">${foodUnits.map((u) => `<option value="${u}">`).join("")}</datalist>`;
 const foodShelfFields = (key,row) =>
-  foodInput(key("shelfLifeDays"),"保质期（天）",row?.shelfLifeDays,'type="number" min="1" max="36500" placeholder="按包装或用户描述填写"') +
-  foodDropdown(key("shelfLifeBase"),"保质期计算起点",
-    foodOption("","暂不计算（可手填到期日期）",row?.shelfLifeBase||"")+
-    foodOption("production","从生产日起算",row?.shelfLifeBase)+foodOption("purchase","从购买日起算",row?.shelfLifeBase));
+  foodDropdown(key("expiryMode"),"有效期填写方式",
+    foodOption("date","到期日期",row?.expirySource==="shelf" ? "duration" : row?.expiresOn ? "date" : row?.shelfLifeDays ? "duration" : "date")+
+    foodOption("duration","保质期",row?.expirySource==="shelf" ? "duration" : row?.expiresOn ? "date" : row?.shelfLifeDays ? "duration" : "date"),'data-food-expiry-mode')+
+  foodInput(key("shelfLifeDays"),"保质期（天，按生产日期自动计算）",row?.shelfLifeDays,'type="number" min="1" max="36500"');
 
 async function foodReferenceData(db) {
   return Promise.all([
@@ -493,7 +494,7 @@ async function foodDetailPage(db,row,url) {
     ${row.intakeInitialAmount!=null ? metric("消耗前库存",row.intakeInitialAmount+" "+row.intakeInitialUnit) : ""}
     ${metric("批次编号",row.batch)}${metric("生产日期",row.producedOn)}${metric("批次备注",row.notes)}
     ${metric(expiryLabel,row.expiresOn)}${metric("保质期",row.shelfLifeDays?row.shelfLifeDays+" 天":"")}
-    ${metric("计算起点",row.shelfLifeBase==="production"?"生产日":row.shelfLifeBase==="purchase"?"购买日":"")}
+
     ${metric("到期提醒开始日期",active?foodExpiryReminderOn(row):null)}
     ${metric("开封日期",row.openedOn)}${metric("冷冻日期",row.frozenOn)}
     ${metric(row.portionParentId?"上次检查（含来源批次）":"上次检查",row.checkedOn)}${metric("下次检查",row.checkDays ? foodAddDays(row.checkedOn || row.purchasedOn || row.createdAt.slice(0,10),row.checkDays) : null)}
@@ -605,7 +606,7 @@ async function foodUpdateBatch(db,row,form,intake=null) {
     if (r("version") && r("version")!==row.updatedAt) return foodError("批次已有新变化，请重新打开编辑页面。",editPath,409);
     const current={...row,unit:row.stockUnit,purchaseTime:row.purchasedAtLocal?.slice(11),timeZone:row.purchaseTimeZone};
     for (const key of ["batch","quantity","storage","packaging","purchasedOn","purchaseTime","timeZone","producedOn",
-      "expiresOn","shelfLifeDays","shelfLifeBase","openedOn","frozenOn","purchasedAmount","purchasedUnit","remainingAmount",
+      "expiresOn","shelfLifeDays","shelfLifeBase","expiryMode","openedOn","frozenOn","purchasedAmount","purchasedUnit","remainingAmount",
       "unit","amountNote","disposition","expiryLead","checkDays","notes","locationId"]) {
       if (!form.has(key)) form.set(key,current[key]??"");
     }
