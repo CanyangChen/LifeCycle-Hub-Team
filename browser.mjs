@@ -156,15 +156,3 @@ for (const button of document.querySelectorAll("[data-intake-submit]")) {
 const wardrobeFilters = document.querySelector("[data-wardrobe-filters]");
 wardrobeFilters?.addEventListener("change", () => wardrobeFilters.requestSubmit());
 
-const wardrobeTime = document.querySelector("[data-wardrobe-time]");
-if (wardrobeTime) {
-  const update = () => {
-    document.querySelectorAll("[data-wardrobe-time-field]").forEach(group => {
-      const enabled = group.dataset.wardrobeTimeField === wardrobeTime.value;
-      group.hidden = !enabled;
-      group.querySelectorAll("input,select").forEach(input => { input.disabled = !enabled; });
-    });
-  };
-  wardrobeTime.addEventListener("change", update);
-  update();
-}

@@ -1,21 +1,18 @@
 const wardrobeLocalDay = () => intakeClock(Intl.DateTimeFormat().resolvedOptions().timeZone).day;
-function wardrobeTimeEditor(purchase) {
+function wardrobeTimeEditor(purchase, quick = false) {
   const day = wardrobeLocalDay();
-  const currentYear = Number(day.slice(0,4));
-  const kind = purchase?.precision === "estimate" ? "original" : purchase?.precision || "unknown";
-  const option = (value,label) => '<option value="'+value+'" '+(kind===value?"selected":"")+'>'+label+'</option>';
-  return '<fieldset class="wide wardrobe-time"><legend>购买时间</legend><label>记得多准确？<select name="purchaseMode" data-wardrobe-time>'+
-    option("unknown","暂时不记得")+option("day","具体日期")+option("month","只记得年月")+option("year","只记得年份")+option("relative","大概几年前")+
-    (purchase?.raw?option("original","保留本次识别时间"):"")+'</select></label>'+
-    '<label data-wardrobe-time-field="day">选择日期<input type="date" name="purchaseDay" max="'+day+'" value="'+escape(purchase?.precision==="day"?purchase.value:day)+'"></label>'+
-    '<label data-wardrobe-time-field="month">选择年月<input type="month" name="purchaseMonth" max="'+day.slice(0,7)+'" value="'+escape(purchase?.precision==="month"?purchase.value:day.slice(0,7))+'"></label>'+
-    '<label data-wardrobe-time-field="year">选择年份<select name="purchaseYear">'+Array.from({length:101},(_,i)=>String(currentYear-i)).map(year=>'<option '+(purchase?.value===year?"selected":"")+'>'+year+'</option>').join("")+'</select></label>'+
-    '<label data-wardrobe-time-field="relative">大概多久以前<select name="purchaseRelative">'+["六个月前","一年前","一年半前","两年前","两三年前","三年前","五年前","十年前"].map(value=>'<option>'+value+'</option>').join("")+'</select></label>'+
-    '<div data-wardrobe-time-field="original"><p>'+escape(purchase?.raw||"")+'</p><input type="hidden" name="purchaseOriginal" value="'+escape(purchase?.raw||"")+'"></div></fieldset>';
+  const exact = purchase?.precision === "day" ? purchase.value : "";
+  const recognized = quick && purchase?.raw && purchase.precision !== "day";
+  return '<fieldset class="wide wardrobe-time"><legend>购买日期</legend>'+
+    (recognized ? '<p>识别时间：'+escape(purchase.raw)+'（约）</p><input type="hidden" name="purchaseOriginal" value="'+escape(purchase.raw)+'">' : "")+
+    '<label>选择年月日<input type="date" name="purchaseDay" max="'+day+'" value="'+escape(exact)+'"></label>'+
+    '<input type="hidden" name="purchaseMode" value="'+(recognized?"quick":"manual")+'"></fieldset>';
 }
 function wardrobeTimeFromForm(form) {
   const get = key => String(form.get(key)||"").trim();
   switch(get("purchaseMode")) {
+    case "manual": return get("purchaseDay");
+    case "quick": return get("purchaseDay") || get("purchaseOriginal");
     case "unknown": return "";
     case "day": if(!get("purchaseDay"))throw Error("请选择购买日期"); return get("purchaseDay");
     case "month": if(!get("purchaseMonth"))throw Error("请选择购买年月"); return get("purchaseMonth");

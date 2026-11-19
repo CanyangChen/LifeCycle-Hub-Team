@@ -133,3 +133,8 @@ input, select, textarea { background: #fff; color: var(--ink); border: 1px solid
 .wardrobe-time { border:1px solid var(--line) !important; padding:18px !important; border-radius:12px; background:#f5f8f2; }
 .wardrobe-time legend { font-size:18px; font-weight:650; }
 .wardrobe-editor textarea { width:100%; margin:10px 0; }
+
+.wardrobe-entry { margin-top:24px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+.wardrobe-entry .wardrobe-card { padding:28px; border:2px solid var(--line); }
+.wardrobe-entry .wardrobe-card:hover { border-color:var(--accent); }
+@media (max-width:600px) { .wardrobe-entry { grid-template-columns:1fr; } }

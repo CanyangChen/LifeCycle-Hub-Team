@@ -1101,10 +1101,14 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
 
 {
  const formPage=await html("/items/clothing/new");
- assert.match(formPage,/一句话快速录入/);
+ assert.match(formPage,/快速录入/);
+ assert.doesNotMatch(formPage,/<textarea/);
+ const manualPage=await html("/items/clothing/new?mode=manual");
+ assert.doesNotMatch(manualPage,/记得多准确|大概几年前|模糊时间可/);
  assert.match(formPage,/手动录入/);
- assert.match(formPage,/type="date"/);
- assert.match(formPage,/type="month"/);
+ assert.match(manualPage,/type="date"/);
+ assert.doesNotMatch(manualPage,/type="month"/);
+ assert.match(manualPage,/<option >经常穿/);
  const before=sqlite.prepare("SELECT count(*) n FROM Item WHERE category='clothing'").get().n;
  const review=await post("/items/clothing/intake",{text:"两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"});
  assert.equal(review.status,200);
@@ -1114,9 +1118,9 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
  assert.match(content,/value="羊毛" checked/);
  assert.match(content,/action="\/items\/clothing\/new"/);
  assert.equal(sqlite.prepare("SELECT count(*) n FROM Item WHERE category='clothing'").get().n,before);
- const saved=await post("/items/clothing/new",{name:"时间选择验收",purchaseMode:"month",purchaseMonth:"2024-05",material:"棉"});
+ const saved=await post("/items/clothing/new",{name:"时间选择验收",purchaseMode:"manual",purchaseDay:"2024-05-15",material:"棉"});
  assert.equal(saved.status,303);
  const id=saved.headers.get("location").split("/").at(-1);
- assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,"month");
+ assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,"day");
  console.log("Wardrobe intake passed: natural text extraction, editable review without writes, date/month picker save.");
 }

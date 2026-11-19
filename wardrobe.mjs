@@ -1,3 +1,8 @@
+const wardrobeChoices = {kind:["上衣","裤装","裙装","外套","鞋靴","配饰","其他"],frequency:["经常穿","偶尔穿","很少穿","未穿过"]};
+function wardrobeSelect(key,label,value="") {
+  const choices=[...new Set([...wardrobeChoices[key],...(value?[value]:[])])];
+  return '<label>'+label+'<select name="'+key+'"><option value="">请选择</option>'+choices.map(choice=>'<option '+(choice===value?"selected":"")+'>'+escape(choice)+'</option>').join("")+'</select></label>';
+}
 const wardrobeFields = {kind:"类别",brand:"品牌",size:"尺码",color:"颜色",material:"材质（逗号分隔）",frequency:"穿着频率",weather:"适用天气（逗号分隔）",care:"洗护标签（逗号分隔）",location:"存放位置",price:"购买价格（元，可选）"};
 const wardrobeTags = {
   material:["棉","羊毛","聚酯纤维","真丝","亚麻"],
@@ -81,12 +86,10 @@ async function wardrobeRoute(request,db,url) {
   const input=(name,label,value="",type="text")=>'<label>'+label+'<input name="'+name+'" type="'+type+'" maxlength="240" value="'+escape(value)+'"></label>';
   function page(item={},data={},message="",review=false) {
     return render(hero(item.name?escape(item.name):"新增衣物",link(root,"返回衣橱"))+
-      (!item.id&&!review?'<section class="panel wardrobe-editor"><h2>一句话快速录入</h2><form method="post" action="'+root+'/intake"><label>描述衣物<textarea name="text" rows="3" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><button class="button">识别并核对</button></form></section><h2>手动录入</h2>':"")+
       (message?'<p role="alert">'+escape(message)+'</p>':"")+
       (item.id?'<p>'+escape(wardrobeAge(data.purchase))+'</p>':"")+
-      '<form method="post" action="/items/clothing/'+(item.id||"new")+'" class="panel editor wardrobe-editor"><fieldset>'+input("name","名称",item.name)+wardrobeTimeEditor(data.purchase)+
-      input("confirmedYear","模糊时间可在这里确认大致年份（可选）",data.purchase?.estimated && data.purchase.precision==="year" ? data.purchase.value : "")+
-      Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : input(key,label,data[key])).join("")+
+      '<form method="post" action="/items/clothing/'+(item.id||"new")+'" class="panel editor wardrobe-editor"><fieldset>'+input("name","名称",item.name)+wardrobeTimeEditor(data.purchase,review || Boolean(data.purchase?.precision && data.purchase.precision!=="day"))+
+      Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : wardrobeChoices[key] ? wardrobeSelect(key,label,data[key]) : input(key,label,data[key])).join("")+
       input("minTemp","最低适用温度 °C",data.minTemp,"number")+input("maxTemp","最高适用温度 °C",data.maxTemp,"number")+
       '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><button class="button">保存档案</button></form>'+
       (item.id?'<form method="post"><button class="button secondary" name="operation" value="'+(item.archivedAt?'restore':'archive')+'">'+(item.archivedAt?'恢复归档':'归档')+'</button></form>'+deleteControl("档案",item.name):""),message&&!review?400:200);
@@ -132,6 +135,15 @@ async function wardrobeRoute(request,db,url) {
       ]);
       return foodRedirect(root+"/"+recordId);
     }catch(error){return page(item,{...data,purchase:{raw:purchaseInput}},error.message);}
+  }
+  if(id==="new"&&request.method==="GET"&&!["quick","manual"].includes(url.searchParams.get("mode"))) {
+    return render(hero("添加衣物",link(root,"返回衣橱"))+
+      '<div class="intake-grid wardrobe-entry">'+link(root+'/new?mode=quick','<h2>快速录入</h2><p>说说这件衣物，识别后核对保存。</p>',"panel wardrobe-card")+
+      link(root+'/new?mode=manual','<h2>手动录入</h2><p>选择标签和购买日期。</p>',"panel wardrobe-card")+'</div>');
+  }
+  if(id==="new"&&url.searchParams.get("mode")==="quick") {
+    return render(hero("快速录入",link(root+"/new","选择录入方式"))+
+      '<form class="panel wardrobe-editor" action="'+root+'/intake" method="post"><label>描述衣物<textarea name="text" rows="4" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><button class="button">识别并核对</button></form>');
   }
   if(id)return page(row||{},row?wardrobeData(row):{});
   const q=url.searchParams.get("q")||"",archived=url.searchParams.get("status")==="archived";
