@@ -17,6 +17,7 @@ sqlite.exec(readFileSync("drizzle/0007_drug_m2.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0008_drug_m3.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0009_food_portions.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0010_record_deletion.sql", "utf8"));
+sqlite.exec(readFileSync("drizzle/0013_wardrobe.sql", "utf8"));
 function statement(sql, params = []) {
   return {
     bind: (...values) => statement(sql, values),
@@ -301,8 +302,8 @@ assert.match(resolveFoodDates("11月26日过期","2026-11-16").dateEvidence,/核
 assert.equal(resolveFoodDates("明天到期","2026-12-31").expiresOn,"2027-01-01");
 const duration=resolveFoodDates("保质期10天","2026-11-16");
 assert.equal(duration.shelfLifeDays,10);
-assert.equal(duration.shelfLifeBase,"");
-assert.match(duration.dateEvidence,/从生产日还是购买日/);
+assert.equal(duration.shelfLifeBase,"production");
+assert.match(duration.dateEvidence,/补充生产日期/);
 assert.equal(resolveFoodDates("生产日期2026年11月5日，保质期十天，从生产日起","2026-11-16").producedOn,"2026-11-05");
 const instantNoodles = await post(base+"/intake",{method:"text",text:"刚才买了两桶方便面，放在柜子里了",timeZone:"Asia/Shanghai"});
 assert.equal(instantNoodles.status,200);
@@ -1030,4 +1031,212 @@ console.log("Automatic medication stock refresh passed after intake, duplicate p
   assert.deepEqual(sqlite.prepare("PRAGMA foreign_key_check").all(),[]);
   console.log("Demo workspaces passed: both accounts seeded, five modules isolated, cross-account deletion and draft confirmation rejected.");
   console.log("Demo account authentication passed: invite reuse, origin, route gate, two sessions, password change, logout, and rate limit.");
+}
+
+{
+ const root="/items/clothing";
+ const response=await post(root+"/new",{name:"衣橱验收外套",purchase:"两年前买的",material:"棉，羊毛",frequency:"经常穿",weather:"晴天",care:"不可漂白",minTemp:"5",maxTemp:"20"});
+ assert.equal(response.status,303);
+ const path=response.headers.get("location").split("?")[0];
+ const id=path.split("/").at(-1);
+ const saved=JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe);
+ assert.equal(saved.purchase.precision,"estimate");
+ assert.equal(saved.purchase.estimated,true);
+ assert.match(await html(root+"?material="+encodeURIComponent("羊毛")) ,/衣橱验收外套/);
+ assert.doesNotMatch(await html(root+"?temperature=30"),/衣橱验收外套/);
+ const edit=await post(path,{name:"衣橱验收外套",purchase:"两年前买的",material:"棉",minTemp:"10",maxTemp:"5"});
+ assert.equal(edit.status,400);
+ assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).minTemp,5);
+ for(const [value,precision] of [["2024年5月","month"],["2023年","year"],["2024年5月15日","day"],["一年半前","estimate"],["两三年前买的","estimate"]]){
+   assert.equal((await post(path,{name:"衣橱验收外套",purchase:value})).status,303);
+   assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,precision);
+ }
+ assert.equal((await post(path,{operation:"archive"})).status,303);
+ assert.equal((await post(path,{operation:"restore"})).status,303);
+ assert.match(await html(root),/衣橱验收外套/);
+ console.log("Wardrobe passed: date precision, relative dates, filtering, temperature validation, archive and restore.");
+}
+
+{
+ const created=await post("/items/clothing/new",{name:"旧精度验证衣物",purchasedOn:"2023-05-01",material:"棉"});
+ assert.equal(created.status,303);
+ const path=created.headers.get("location");
+ const id=path.split("?")[0].split("/").at(-1);
+ sqlite.prepare("UPDATE ClothingDetail SET wardrobe=NULL,purchasedOn='2023-05-01' WHERE itemId=?").run(id);
+ assert.match(await html(path),/2023-05-01/);
+ const multi=new URLSearchParams({name:"旧精度验证衣物",purchase:"2023-05-01",weatherCustom:"雾天"});
+ multi.append("material","棉");multi.append("material","羊毛");
+ assert.equal((await post(path,multi)).status,303);
+ assert.match(await html(path),/name="material" value="羊毛" checked/);
+ assert.equal((await post(path,{name:"旧精度验证衣物",purchase:""})).status,303);
+ assert.match(await html(path),/购买时间未填写/);
+ assert.equal(sqlite.prepare("SELECT purchasedOn FROM ClothingDetail WHERE itemId=?").get(id).purchasedOn,null);
+ for(const purchase of ["2024-02-30","0000年","2099年","前几年买的","2024年13月"]){
+  assert.equal((await post(path,{name:"旧精度验证衣物",purchase})).status,400,purchase);
+ }
+ for(const purchase of ["2024年5月购买","2023年购入","买了两年","2024-05-15"]){
+  assert.equal((await post(path,{name:"旧精度验证衣物",purchase})).status,303,purchase);
+ }
+ const before=sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe;
+ const parsed=JSON.parse(before);
+ assert.equal((await post(path,{name:"修改其他字段",purchase:parsed.purchase.raw})).status,303);
+ assert.deepEqual(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase,parsed.purchase);
+ console.log("Wardrobe compatibility passed: legacy dates, explicit clearing, multiselect, invalid dates and stable reference.");
+}
+
+{
+ const response=await post("/items/clothing/new",{name:"节日购买验收",purchase:"前几年春节买的",confirmedYear:"2022",material:"棉，羊毛"});
+ assert.equal(response.status,303);
+ const path=response.headers.get("location").split("?")[0],id=path.split("/").at(-1);
+ const data=JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe);
+ assert.equal(data.purchase.raw,"前几年春节买的");
+ assert.equal(data.purchase.value,"2022");
+ assert.equal(data.purchase.precision,"year");
+ assert.equal(data.purchase.estimated,true);
+ assert.equal((await post(path,{name:"节日购买验收",purchase:"前几年春节买的",confirmedYear:"2099"})).status,400);
+ assert.match(await html("/items/clothing?material="+encodeURIComponent("棉，羊毛")),/节日购买验收/);
+ assert.doesNotMatch(await html("/items/clothing?material="+encodeURIComponent("棉，真丝")),/节日购买验收/);
+ console.log("Wardrobe confirmation passed: ambiguous time keeps original text and confirmed year; combined tags require all selections.");
+}
+
+{
+ const formPage=await html("/items/clothing/new");
+ assert.match(formPage,/快速录入/);
+ assert.doesNotMatch(formPage,/<textarea/);
+ const manualPage=await html("/items/clothing/new?mode=manual");
+ assert.doesNotMatch(manualPage,/记得多准确|大概几年前|模糊时间可/);
+ assert.match(formPage,/手动录入/);
+ assert.match(manualPage,/type="date"/);
+ assert.doesNotMatch(manualPage,/type="month"/);
+ assert.match(manualPage,/<option >经常穿/);
+ const before=sqlite.prepare("SELECT count(*) n FROM Item WHERE category='clothing'").get().n;
+ const review=await post("/items/clothing/intake",{text:"两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"});
+ assert.equal(review.status,200);
+ const content=await review.text();
+ assert.match(content,/value="羊毛外套"/);
+ assert.match(content,/value="399"/);
+ assert.match(content,/value="羊毛" checked/);
+ assert.match(content,/action="\/items\/clothing\/new"/);
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM Item WHERE category='clothing'").get().n,before);
+ const saved=await post("/items/clothing/new",{name:"时间选择验收",purchaseMode:"manual",purchaseDay:"2024-05-15",material:"棉"});
+ assert.equal(saved.status,303);
+ const id=saved.headers.get("location").split("/").at(-1);
+ assert.equal(JSON.parse(sqlite.prepare("SELECT wardrobe FROM ClothingDetail WHERE itemId=?").get(id).wardrobe).purchase.precision,"day");
+ console.log("Wardrobe intake passed: natural text extraction, editable review without writes, date/month picker save.");
+}
+
+{
+ const day="2026-11-19";
+ for(const [text,expected] of [
+  ["记得3天内吃完","2026-11-22"],["两天之内喝完","2026-11-21"],
+  ["一周内吃完","2026-11-26"],["一个星期内用完","2026-11-26"],
+  ["十天后到期","2026-11-29"],["明天到期","2026-11-20"],
+  ["保质期10天",""],["两天内吃完，三天内吃完",""],
+ ]){
+  assert.equal(resolveFoodDates(text,day).expiresOn,expected,text);
+ }
+ const review=await post("/items/food/intake",{method:"text",timeZone:"Asia/Shanghai",text:"记录：今天买了两斤饺子，放冰箱了，记得3天内吃完。"});
+ assert.equal(review.status,200);
+ const page=await review.text();
+ assert.match(page,/name="candidate-0-name"[^>]*value="饺子"/);
+ assert.match(page,/name="candidate-0-purchasedAmount"[^>]*value="2"/);
+ assert.match(page,/name="candidate-0-unit"[^>]*value="斤"/);
+ assert.match(page,new RegExp('name="candidate-0-expiresOn"[^>]*value="'+relative(3)+'"'));
+ assert.match(page,/按用户描述计算到期日期/);
+ assert.match(page,/请确认储存位置/);
+ for(const [text,name,unit] of [
+   ["帮我记一下：刚才买了两桶方便面，放柜子里了","方便面","桶"],
+   ["记录 今天买了三盒酸奶，放冷藏了，明天到期","酸奶","盒"],
+   ["记一下：昨天买了一袋大米，保质期10天","大米","袋"],
+ ]){
+  const r=await post("/items/food/intake",{method:"text",text,timeZone:"Asia/Shanghai"});
+  assert.equal(r.status,200);
+  const html=await r.text();
+  assert.ok(html.includes('value="'+name+'"'),text);
+  assert.ok(html.includes('value="'+unit+'"'),text);
+ }
+ const clothing=await post("/items/clothing/intake",{text:"帮我记录：两年前入手了一件羊毛外套，总共399元，不怎么穿，收在衣柜里。"});
+ assert.equal(clothing.status,200);
+ const card=await clothing.text();
+ assert.match(card,/value="羊毛外套"/);
+ assert.match(card,/value="399"/);
+ assert.match(card,/很少穿/);
+ console.log("Colloquial food and wardrobe passed: prefixes, use-by deadlines, duration ambiguity, units, locations, purchase synonyms and frequency.");
+}
+
+{
+ for(const text of [
+   "记录：刚才买了一盒感冒灵颗粒，12包，每天三次，每次一包，饭后服用",
+   "帮我记一下：今天买了一盒测试药片，24片，每日两次，每次一片",
+   "记一下：昨天买了两盒测试胶囊，每盒12粒",
+ ]){
+  const response=await worker.fetch(new Request(origin+"/items/medicine/intake",{method:"POST",
+    headers:{origin,"oai-authenticated-user-id":"drug-speech-audit"},
+    body:new URLSearchParams({method:"text",text,timeZone:"Asia/Shanghai"})}),{DB});
+  assert.equal(response.status,200,text);
+  const html=await response.text();
+  assert.match(html,/name="name"/);
+  assert.doesNotMatch(html,/value="记录|value="帮我记|value="记一下/);
+  if(text.includes("感冒灵"))assert.match(html,/value="感冒灵颗粒"/);
+ }
+ console.log("Colloquial medication passed: dictation prefixes, just-purchased batches, package quantities and dosage instructions.");
+}
+
+{
+ const review=await post("/items/food/intake",{method:"text",timeZone:"Asia/Shanghai",text:"记录：今天买了两斤饺子，放冰箱了，记得3天内吃完。"});
+ const text=await review.text(),draft=idOfDraft(text);
+ const response=await post("/items/food/intake",{operation:"confirm",draft,
+  "candidate-0-foodId":"new","candidate-0-name":"口语验收饺子","candidate-0-purchasedAmount":"2",
+  "candidate-0-unit":"斤","candidate-0-locationId":"fridge","candidate-0-expiresOn":relative(3)});
+ assert.equal(response.status,303);
+ const row=sqlite.prepare("SELECT f.*,i.id FROM FoodDetail f JOIN Item i ON i.id=f.itemId WHERE i.name='口语验收饺子'").get();
+ assert.equal(row.expiresOn,relative(3));
+ assert.equal(row.stockUnit,"斤");
+ assert.match(await html("/items/food"),/口语验收饺子/);
+ assert.match(await html("/items/food/"+row.id),new RegExp(relative(3)));
+ console.log("Use-by deadline persisted with batch and appears in inventory and detail after confirmation.");
+}
+
+{
+ const fields={foodId:"new",name:"生产日计算验收",purchasedAmount:"1",unit:"袋",locationId:"cupboard",
+  expiryMode:"duration",shelfLifeDays:"10",producedOn:"2026-11-01"};
+ assert.equal((await post(base+"/new",{...fields,producedOn:""})).status,400);
+ const saved=await post(base+"/new",fields);
+ assert.equal(saved.status,303);
+ const path=saved.headers.get("location").split("?")[0];
+ const id=path.split("/").at(-1);
+ let row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.expiresOn,"2026-11-11");
+ assert.equal(row.shelfLifeBase,"production");
+ assert.doesNotMatch(await html(path+"/edit"),/保质期计算起点/);
+ assert.equal((await post(path+"/edit",{expiryMode:"date",expiresOn:"2026-12-01"})).status,303);
+ row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.expiresOn,"2026-12-01");
+ assert.equal(row.shelfLifeBase,null);
+ assert.equal(row.shelfLifeDays,null);
+ const review=await post(base+"/intake",{method:"text",text:"买了一袋面粉，生产日期2026年11月1日，保质期10天",timeZone:"Asia/Shanghai"});
+ assert.equal(review.status,200);
+ assert.match(await review.text(),/name="candidate-0-expiresOn"[^>]*value="2026-11-11"/);
+ console.log("Food date modes passed: production-based calculation, missing production rejected, direct date switch, and intake calculation.");
+}
+
+{
+ const created=await post(base+"/new",{foodId:"new",name:"开封简化验收",purchasedAmount:"2",unit:"盒",locationId:"cupboard",openedState:"opened",timeZone:"Asia/Shanghai"});
+ assert.equal(created.status,303);
+ const path=created.headers.get("location").split("?")[0],id=path.split("/").at(-1);
+ let row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.packaging,"opened");
+ assert.equal(row.openedOn,relative(0));
+ const rules=sqlite.prepare("SELECT count(*) n FROM ReminderRule WHERE itemId=?").get(id).n;
+ const edit=await html(path+"/edit");
+ assert.match(edit,/是否开封/);
+ assert.doesNotMatch(edit,/name="frozenOn"|冷冻日期/);
+ assert.equal((await post(path+"/edit",{openedState:"opened",openedOn:relative(-1)})).status,303);
+ assert.equal(sqlite.prepare("SELECT openedOn FROM FoodDetail WHERE itemId=?").get(id).openedOn,relative(-1));
+ assert.equal((await post(path+"/edit",{openedState:"sealed"})).status,303);
+ row=sqlite.prepare("SELECT * FROM FoodDetail WHERE itemId=?").get(id);
+ assert.equal(row.openedOn,null);
+ assert.equal(row.packaging,"sealed");
+ assert.equal(sqlite.prepare("SELECT count(*) n FROM ReminderRule WHERE itemId=?").get(id).n,rules);
+ console.log("Food opening selector passed: today default, editable date, sealed reset, frozen date removed, no extra reminder.");
 }

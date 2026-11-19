@@ -1,3 +1,4 @@
+import { wardrobeRoute } from "./wardrobe.mjs";
 import { demoAuthRoute } from "./demo-auth.mjs";
 import { catalog, styles, browser } from "./generated.mjs";
 import { parseQuantity } from "./quantity.mjs";
@@ -249,6 +250,10 @@ async function businessRoute(request, env, url, identity) {
   if (url.pathname === "/items/medicine" || url.pathname.startsWith("/items/medicine/")) {
     if (identity) await seedDemo();
     return await drugRoute(request,env,url);
+  }
+  if (url.pathname === "/items/clothing" || url.pathname.startsWith("/items/clothing/")) {
+    await seedDemo();
+    return wardrobeRoute(request,env.DB,url);
   }
   const [, category, id] = url.pathname.match(/^\/items\/([a-z]+)(?:\/([a-z0-9-]+))?\/?$/) ?? [];
   if (category && Object.hasOwn(catalog, category)) {

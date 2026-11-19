@@ -31,7 +31,7 @@ function intakeLocation(line,locations) {
   if (explicit) return explicit.id;
   if (line.includes("冷冻")) return locations.find((r)=>r.id==="freezer")?.id || "";
   if (line.includes("冷藏")) return locations.find((r)=>r.id==="fridge")?.id || "";
-  if (/(?:放在|放进|放入|放到|储存在)\s*(?:厨房(?:的)?)?(?:柜子|储物柜)(?:里|内|中)?(?:了|[，,。；;]|$)/.test(line)) {
+  if (/(?:放在|放进|放入|放到|放|储存在)\s*(?:厨房(?:的)?)?(?:柜子|储物柜)(?:里|内|中)?(?:了|[，,。；;]|$)/.test(line)) {
     return locations.find((r)=>r.id==="cupboard")?.id || "";
   }
   return "";
@@ -39,7 +39,7 @@ function intakeLocation(line,locations) {
 function intakeRuleRows(text,locations,clock) {
   const rows=foodTextCandidates(text,locations,clock.day).map((row)=>{
     const line=row.source;
-    const isPurchase=foodPurchaseLead.test(line);
+    const isPurchase=foodPurchaseLead.test(intakeCleanSpeech(line));
     const count=line.match(/(?:改成|改为|减少|吃了|喝了)\s*([\d.]+|[一二两三四五六七八九十]+)\s*(千克|公斤|毫升|斤|克|升|个|盒|袋|瓶|罐)/);
     const amount=count?(/^[0-9]/.test(count[1])?Number(count[1]):numberOf(count[1])):row.amount;
     const place=intakeLocation(line,locations);
@@ -116,7 +116,7 @@ function intakeNormalize(candidate,{locations,categories,clock}) {
   const systemDate=!foodDate(candidate.purchasedOn);
   const systemTime=!candidate.purchaseTime && (systemDate || candidate.purchasedOn===clock.day);
   const purchaseDate=systemDate?clock.day:candidate.purchasedOn;
-  const base=candidate.shelfLifeBase==="production"?candidate.producedOn:purchaseDate;
+  const base=candidate.producedOn;
   const computed=candidate.shelfLifeBase&&candidate.shelfLifeDays&&foodDate(base)?foodAddDays(base,candidate.shelfLifeDays):"";
   const explicit=foodDate(candidate.expiresOn);
   const missingBase=candidate.shelfLifeBase&&!computed&&!explicit;
@@ -125,8 +125,8 @@ function intakeNormalize(candidate,{locations,categories,clock}) {
     producedOn:foodDate(candidate.producedOn)?candidate.producedOn:"",
     expiresOn:explicit?candidate.expiresOn:foodDate(computed)?computed:"",
     expirySource:explicit?candidate.expirySource:computed?"shelf":"",
-    shelfLifeBase:explicit?"":candidate.shelfLifeBase,
-    dateEvidence:missingBase?[candidate.dateEvidence,"请补充保质期起点对应的日期，或改为暂不计算。"].filter(Boolean).join(" "):candidate.dateEvidence,
+    shelfLifeBase:explicit?"":candidate.shelfLifeDays?"production":"",
+    dateEvidence:missingBase?[candidate.dateEvidence,"请补充生产日期，系统会自动计算到期日期。"].filter(Boolean).join(" "):candidate.dateEvidence,
     locationId:locations.some((r)=>r.id===candidate.locationId)?candidate.locationId:"unassigned",
     categoryId:categories.some((r)=>r.id===candidate.categoryId)?candidate.categoryId:"",
     systemDate,systemTime,shortLife:suggested};
@@ -200,12 +200,13 @@ function intakeReview(draft,candidates,profiles,locations,categories,rows,transc
         ${foodInput(key("purchaseTime"),"购买时间",c.purchaseTime,'type="time"')}
         ${(c.shortLife||c.expiresOn||c.shelfLifeDays||c.dateEvidence)?expiry:""}
         ${c.shelfLifeDays?duration:""}
+        ${foodInput(key("producedOn"),"生产日期",c.producedOn,'type="date"')}
         <details class="wide intake-more"><summary>其他资料${c.brand||c.specification?" · "+escape([c.brand,c.specification].filter(Boolean).join(" · ")):""}</summary>
         <div>
           ${foodInput(key("brand"),"品牌",c.brand,'maxlength="120"')}
           ${foodDropdown(key("categoryId"),"分类",foodCategoryOptions(categories,c.categoryId))}
           ${foodInput(key("specification"),"规格",c.specification,'maxlength="240"')}
-          ${foodInput(key("producedOn"),"生产日期",c.producedOn,'type="date"')}
+
           ${(!c.shortLife&&!c.expiresOn&&!c.shelfLifeDays&&!c.dateEvidence)?expiry:""}
           ${!c.shelfLifeDays?duration:""}
           ${foodInput(key("amountNote"),"模糊数量",c.amountNote,'maxlength="240"')}
@@ -245,7 +246,7 @@ function intakeClaim(db,id,index,now,guard="",keys=[]) {
 }
 const intakeConfirmedFields={
   name:"name",brand:"brand",categoryId:"categoryId",specification:"specification",purchasedOn:"purchasedOn",
-  purchaseTime:"purchaseTime",producedOn:"producedOn",expiresOn:"expiresOn",shelfLifeDays:"shelfLifeDays",shelfLifeBase:"shelfLifeBase",purchasedAmount:"amount",
+  expiryMode:"expiryMode",purchaseTime:"purchaseTime",producedOn:"producedOn",expiresOn:"expiresOn",shelfLifeDays:"shelfLifeDays",shelfLifeBase:"shelfLifeBase",purchasedAmount:"amount",
   unit:"unit",amountNote:"amountNote",locationId:"locationId",storage:"storage",storageAdvice:"storageAdvice",checkDays:"checkDays",
 };
 function intakeConfirmFollowup(form,prefix,candidate,followup) {
