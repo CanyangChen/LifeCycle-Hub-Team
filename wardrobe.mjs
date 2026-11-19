@@ -67,7 +67,7 @@ function wardrobeData(row) {
 function wardrobeTagEditor(key, value) {
   const selected = wardrobeSplit(value);
   const choices = [...new Set([...wardrobeTags[key],...selected])];
-  return '<fieldset><legend>'+escape(wardrobeFields[key])+'</legend>'+
+  return '<fieldset class="wardrobe-tags"><legend>'+escape(wardrobeFields[key])+'</legend>'+
     choices.map(tag => '<label><input type="checkbox" name="'+key+'" value="'+escape(tag)+'" '+(selected.includes(tag)?"checked":"")+'>'+escape(tag)+'</label>').join("")+
     '<label>补充标签（逗号分隔）<input name="'+key+'Custom" maxlength="240"></label></fieldset>';
 }
@@ -83,7 +83,7 @@ async function wardrobeRoute(request,db,url) {
     return render(hero(item.name?escape(item.name):"新增衣物",link(root,"返回衣橱"))+
       (message?'<p role="alert">'+escape(message)+'</p>':"")+
       (item.id?'<p>'+escape(wardrobeAge(data.purchase))+'</p>':"")+
-      '<form method="post" class="panel editor"><fieldset>'+input("name","名称",item.name)+input("purchase","购买时间（日期、年月、年份或两年前）",data.purchase?.raw)+
+      '<form method="post" class="panel editor wardrobe-editor"><fieldset>'+input("name","名称",item.name)+input("purchase","购买时间（日期、年月、年份或两年前）",data.purchase?.raw)+
       input("confirmedYear","模糊时间可在这里确认大致年份（可选）",data.purchase?.estimated && data.purchase.precision==="year" ? data.purchase.value : "")+
       Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : input(key,label,data[key])).join("")+
       input("minTemp","最低适用温度 °C",data.minTemp,"number")+input("maxTemp","最高适用温度 °C",data.maxTemp,"number")+
@@ -133,8 +133,8 @@ async function wardrobeRoute(request,db,url) {
   });
   if(url.searchParams.get("sort")==="purchase")rows.sort((a,b)=>(wardrobeData(b).purchase?.value||"").localeCompare(wardrobeData(a).purchase?.value||""));
   else rows.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
-  return render(hero("我的衣橱","衣物、购买时长与洗护标签",link(root+"/new","新增衣物","button"))+
-    '<form class="panel editor" data-wardrobe-filters><fieldset>'+input("q","名称搜索",q)+["kind","material","frequency","weather","care"].map(k=>input(k,wardrobeFields[k],url.searchParams.get(k))).join("")+input("temperature","适用温度 °C",url.searchParams.get("temperature"),"number")+
+  return render(hero("我的衣橱","衣物、购买时长与洗护标签",link(root+"/new","＋ 新增衣物","button wardrobe-create"))+
+    '<form class="panel editor wardrobe-filters" data-wardrobe-filters><fieldset>'+input("q","名称搜索",q)+'<details class="wide wardrobe-more"'+(["kind","material","frequency","weather","care","temperature"].some(k=>url.searchParams.get(k))?' open':'')+'><summary>更多筛选</summary><div class="wardrobe-filter-grid">'+["kind","material","frequency","weather","care"].map(k=>input(k,wardrobeFields[k],url.searchParams.get(k))).join("")+input("temperature","适用温度 °C",url.searchParams.get("temperature"),"number")+'</div></details>'+
     '<label>状态<select name="status"><option value="active">在用</option><option value="archived" '+(archived?"selected":"")+'>已归档</option></select></label><label>排序<select name="sort"><option value="updated">最近更新</option><option value="purchase" '+(url.searchParams.get("sort")==="purchase"?"selected":"")+'>购买时间</option></select></label></fieldset><button class="button">筛选</button></form>'+
-    '<div class="intake-grid">'+rows.map(r=>{const d=wardrobeData(r);return link(root+"/"+r.id,'<span aria-label="衣物占位图">◇</span><h2>'+escape(r.name)+'</h2><p>'+escape(wardrobeAge(d.purchase))+'</p><p>'+escape([d.kind,d.material,d.frequency,d.care].filter(Boolean).join(" · "))+'</p><p>温度 '+escape(d.minTemp??"未标记")+" ～ "+escape(d.maxTemp??"未标记")+' °C · '+escape(d.weather||"天气未标记")+'</p>',"panel");}).join("")+(rows.length ? "" : '<p class="empty">暂无匹配衣物。</p>')+'</div>');
+    '<div class="intake-grid wardrobe-grid">'+rows.map(r=>{const d=wardrobeData(r);return link(root+"/"+r.id,'<div class="wardrobe-placeholder" aria-label="衣物占位图">◇</div><h2>'+escape(r.name)+'</h2><p>'+escape(wardrobeAge(d.purchase))+'</p><p>'+escape([d.kind,d.material,d.frequency,d.care].filter(Boolean).join(" · "))+'</p><p>温度 '+escape(d.minTemp??"未标记")+" ～ "+escape(d.maxTemp??"未标记")+' °C · '+escape(d.weather||"天气未标记")+'</p><span class="wardrobe-card-action">查看与编辑 →</span>',"panel wardrobe-card");}).join("")+(rows.length ? "" : '<p class="empty">暂无匹配衣物。</p>')+'</div>');
 }
