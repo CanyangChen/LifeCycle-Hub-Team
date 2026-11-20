@@ -14,6 +14,34 @@ ChatGPT、邀请码或网络连接。文字规则提取和手动录入可离线�
    第一次打开会建库并添加虚构样例。每位组员都可自行编辑样例和创建记录。
 5. 关闭浏览器不会停止服务。需要停止时，在启动窗口按 Ctrl+C。关闭后可双击重新启动。
 
+## 已有组员更新到最新 main
+
+原有 Windows 本地启动方式保持不变，不需要迁移到云端，也无需重新注册账号。
+
+1. 先在原启动窗口按 Ctrl+C，等待进程结束，再备份自己的 `%LOCALAPPDATA%\LifeCycleHub-Team` 目录。
+2. Git 用户在项目工作区干净时执行：
+
+```powershell
+git status --short
+git switch main
+git pull --ff-only origin main
+.\start-local.cmd
+```
+
+出现未提交修改或无法快进时停止，请负责人协助；不要 reset、force push 或删除数据。ZIP 用户可将新版本解压到新目录，再双击 `start-local.cmd`；默认数据在用户目录中，换代码目录不应丢失数据。自定义过 `LIFECYCLE_TEAM_DATA_DIR` 的用户应继续使用原绝对路径。
+
+启动时自动应用尚未执行的迁移，包括设备 `0014` 和订阅 `0015`；旧数据库迁移前自动生成 `.before-migration-时间戳.sqlite` 快照。不要复制组员的数据库，或把个人版数据库指向团队环境。发生迁移错误保留原库、快照与错误信息，不删除重建。回退旧代码不等于回退数据库。
+
+新版本包含设备购买/保修/维护、订阅状态/日期提醒，以及五模块文字规则录入与统一取消按钮。更新后须重启原服务，重复点击启动脚本只复用服务，不热更新正在运行的代码。
+
+本地服务只监听本机。每位组员在自己的电脑上打开启动窗口显示的地址；`127.0.0.1` 不会访问负责人电脑，设备之间也不会自动同步数据。
+
+## 关闭、重启与恢复
+
+关闭浏览器后服务仍运行。停止请在启动窗口按 Ctrl+C。电脑关机后，下次开机重新双击 `start-local.cmd`，本项目不配置开机自启动。团队版目前没有独立停止脚本。
+
+恢复备份前先停止服务并另存当前目录，优先在新测试目录恢复。设置 `LIFECYCLE_TEAM_DATA_DIR` 为该目录后启动，检查食品、药品、设备、订阅和维护记录，再决定是否用于日常使用。不要覆盖正在运行的 SQLite 文件。
+
 ## 数据与备份
 
 - 数据库：%LOCALAPPDATA%\LifeCycleHub-Team\data\team.sqlite。
@@ -37,7 +65,14 @@ ChatGPT、邀请码或网络连接。文字规则提取和手动录入可离线�
 
 main 为稳定分支。每项任务使用功能分支，测试通过后发起 Pull Request。
 运行 node build.mjs 构建，运行 npm test 执行冒烟和权限回归。
-也可用 node build.mjs --test-legacy 和 node --test smoke.test.mjs 分步执行。
+完整分步检查如下（测试使用隔离数据库，不使用组员的日常库）：
+
+```powershell
+node build.mjs --test-legacy
+node --test smoke.test.mjs home-ui.test.mjs browser-filter.test.mjs device.test.mjs subscription.test.mjs
+```
+
+`node start-team.mjs --no-browser` 可验证启动而不自动弹出浏览器，仍需手动打开输出的地址。最近在 Windows 临时目录验证了启动器、五模块 HTTP 访问、重复启动复用、写入后结束测试进程并重启的数据保留；真实 Windows 重启和浏览器视觉验收仍需各成员实际确认。
 
 ## 课堂演示操作
 

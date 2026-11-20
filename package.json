@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node build.mjs --test-legacy && node --test smoke.test.mjs",
+    "test": "node build.mjs --test-legacy && node --test smoke.test.mjs home-ui.test.mjs browser-filter.test.mjs device.test.mjs subscription.test.mjs",
     "start": "node start-team.mjs"
   },
   "engines": {

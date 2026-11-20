@@ -26,7 +26,7 @@ function portAvailable(port) {
   });
 }
 function openBrowser(address) {
-  if (process.platform === "win32") {
+  if (process.platform === "win32" && !process.argv.includes("--no-browser")) {
     const browser = spawn("cmd.exe", ["/d", "/c", "start", "", address], {stdio:"ignore",windowsHide:true});
     browser.on("error", () => {});
   }
