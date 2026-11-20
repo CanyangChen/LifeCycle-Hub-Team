@@ -4,6 +4,53 @@
 每位组员运行自己的程序，数据只保存在自己的 Windows 用户目录。启动和使用无需 GitHub、
 ChatGPT、邀请码或网络连接。文字规则提取和手动录入可离线使用。
 
+## 当前交接版本（2026-11-20）
+
+四轮 UI 优化已同步至团队分支 **`codex/ui-v25-handoff`**，代码基线为 `678961c`。团队 `main` 尚未合并这些变更；下载或测试时请明确选择交接分支，不要将默认 main 当作最新 UI。
+
+本轮包含五模块主要录入表单、按钮与返回入口统一、文字和空状态规范化、首页 V2.5 配色及食品日历星期标题配色。保留各模块原有业务逻辑和团队本地启动方案。没有复制个人数据库、账号密码、上传文件或密钥，也没有引入个人仓库 Git 历史。
+
+### 获取交接分支
+
+首次使用 Git 的组员：
+
+```powershell
+git clone --branch codex/ui-v25-handoff https://github.com/CanyangChen/LifeCycle-Hub-Team.git
+Set-Location LifeCycle-Hub-Team
+.\start-local.cmd
+```
+
+已有副本的组员先停止服务并备份自己的数据，确认工作区干净后执行：
+
+```powershell
+git status --short
+git fetch origin
+git switch codex/ui-v25-handoff
+git pull --ff-only origin codex/ui-v25-handoff
+.\start-local.cmd
+```
+
+有未提交修改、拉取失败或分支切换失败时停止，请负责人协助，不要丢弃修改或重置数据库。ZIP 用户在 GitHub 分支选择器选择 `codex/ui-v25-handoff` 后再下载 ZIP。
+
+### 验证与后续分工
+
+在项目目录运行：
+
+```powershell
+npm test
+```
+
+该命令先构建，再运行食品、药品、设备、订阅、首页、筛选、录入入口、日期选择及颜色对比度等现有回归检查。交接基线构建与 8 个测试文件通过；自动化通过不等于实际 PC/手机和云端环境已验收。
+
+后续由组员负责：
+
+- 五模块 PC 与移动端完整操作、截图、布局和高亮度屏幕验收。
+- 账号登录、会话、注册/邀请码及后端跨账号权限检查。本地独立模式无需登录，不代表云端认证已完成验收。
+- 独立测试数据库、迁移、文件存储、备份与恢复验证。
+- 云端部署方案与实施评估，包括身份认证、数据隔离、密钥、持久化和中国大陆可访问性；当前仍以本地 Web 运行，不要求先部署云端。
+
+详见 [阶段交接说明](docs/team-handoff.md) 与 [首页颜色检查记录](docs/ui015-home-v25-review.md)。组员从交接分支创建各自 feature/fix 分支，通过 PR 审查；验收后再合并团队 main。AI 拍照/语音、后台调度等未实际验收的能力不得标记完成。
+
 ## 第一次使用
 
 1. 从 https://nodejs.org/ 安装 Node.js 24 LTS。安装后重新打开终端。
