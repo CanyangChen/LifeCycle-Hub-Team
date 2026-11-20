@@ -391,7 +391,7 @@ async function foodNew(db, form) {
   }
   const [profiles,locations,categories] = await foodReferenceData(db);
   const choices = '<option value="" selected disabled>选择已有食品档案</option>'+foodOptions(profiles,"")+foodOption("new","＋ 新建食品档案","");
-  return render(foodBack("添加库存批次","每次购买单独记录。",foodButton(foodRoot+"/intake","快速记录")) +
+  return render(foodBack("添加库存批次","每次购买单独记录。",moduleEntry(foodRoot+"/intake",foodRoot+"/new")) +
     foodForm('<div class="wide food-subhead"><h2>食品档案</h2><p>这是什么食品？通常只需建一次。</p></div>' +
       foodDropdown("foodId","选择食品",choices,"required data-profile-picker") +
       `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${foodProfileFields(null,categories,true)}</fieldset>

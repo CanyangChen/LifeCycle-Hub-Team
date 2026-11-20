@@ -247,7 +247,7 @@ async function drugNewPage(db,user,form,url) {
   const options=foodOption("","选择已有档案",requested)+profiles.map((r)=>foodOption(r.id,drugProfileTitle(r),requested)).join("")+
     foodOption("new","＋ 新建药品档案",requested);
   const clock=intakeClock("Asia/Shanghai");
-  return render(drugBack("新增药品批次","每次购买新建独立批次。",foodButton(drugRoot+"/intake","快速录入"))+
+  return render(drugBack("新增药品批次","每次购买新建独立批次。",moduleEntry(drugRoot+"/intake",drugRoot+"/new"))+
     foodForm('<div class="wide food-subhead"><h2>药品档案</h2></div>'+
       foodDropdown("drugId","选择药品",options,"required data-profile-picker")+
       `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${drugProfileFields({},categories,[])}</fieldset>

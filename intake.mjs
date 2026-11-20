@@ -96,11 +96,12 @@ function intakeMatch(candidate,profiles) {
   return {preferred:precise.length===1?precise[0].id:"",options:candidates.slice(0,12)};
 }
 function intakeEntry(hasAI, message="", status=200, context={}) {
-  const title=context.title||foodBack("快速记录","提供照片、录音或一句话，核对后保存。",foodButton(foodRoot+"/new","手动录入"));
+  const title=context.title||foodBack("快速记录","提供照片、录音或一句话，核对后保存。",moduleEntry(foodRoot+"/intake",foodRoot+"/new"));
+  const cancelHref=context.cancelHref||foodRoot;
   const placeholder=context.placeholder||"昨天买了两斤苹果，放在冰箱冷藏室";
   const tz='<input type="hidden" name="timeZone" data-intake-zone value="Asia/Shanghai">';
   const form=(method,content,button)=>`<form class="panel editor" method="post" enctype="multipart/form-data">
-    ${intakeHidden("method",method)}${tz}<fieldset>${content}</fieldset><button class="button" data-intake-submit>${button}</button></form>`;
+    ${intakeHidden("method",method)}${tz}<fieldset>${content}</fieldset><div class="food-toolbar"><button class="button" data-intake-submit>${button}</button>${link(cancelHref,"取消","button secondary")}</div></form>`;
   return render(title+(message?`<p class="notice error" role="alert">${escape(message)}</p>`:"")+
     (!hasAI?'<p class="notice">AI 服务未配置。可以使用文字规则提取或手动录入。</p>':"")+
     `<section><div class="section-heading"><h2>文字</h2></div>${form("text",

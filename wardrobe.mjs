@@ -85,13 +85,13 @@ async function wardrobeRoute(request,db,url) {
   const row=all.find(r=>r.id===id);
   const input=(name,label,value="",type="text")=>'<label>'+label+'<input name="'+name+'" type="'+type+'" maxlength="240" value="'+escape(value)+'"></label>';
   function page(item={},data={},message="",review=false) {
-    return render(hero(item.name?escape(item.name):"新增衣物",link(root,"返回衣橱"))+
+    return render(hero(item.name?escape(item.name):"新增衣物",link(root,"返回衣橱"),!item.id?moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual"):"")+
       (message?'<p role="alert">'+escape(message)+'</p>':"")+
       (item.id?'<p>'+escape(wardrobeAge(data.purchase))+'</p>':"")+
       '<form method="post" action="/items/clothing/'+(item.id||"new")+'" class="panel editor wardrobe-editor"><fieldset>'+input("name","名称",item.name)+wardrobeTimeEditor(data.purchase,review || Boolean(data.purchase?.precision && data.purchase.precision!=="day"))+
       Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : wardrobeChoices[key] ? wardrobeSelect(key,label,data[key]) : input(key,label,data[key])).join("")+
       input("minTemp","最低适用温度 °C",data.minTemp,"number")+input("maxTemp","最高适用温度 °C",data.maxTemp,"number")+
-      '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><button class="button">保存档案</button></form>'+
+      '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><div class="food-toolbar"><button class="button">保存档案</button>'+link(root,"取消","button secondary")+'</div></form>'+
       (item.id?'<form method="post"><button class="button secondary" name="operation" value="'+(item.archivedAt?'restore':'archive')+'">'+(item.archivedAt?'恢复归档':'归档')+'</button></form>'+deleteControl("档案",item.name):""),message&&!review?400:200);
   }
   if(id&&id!=="new"&&id!=="intake"&&!row)return render(hero("找不到档案",link(root,"返回衣橱")),404);
@@ -142,8 +142,8 @@ async function wardrobeRoute(request,db,url) {
       link(root+'/new?mode=manual','<h2>手动录入</h2><p>选择标签和购买日期。</p>',"panel wardrobe-card")+'</div>');
   }
   if(id==="new"&&url.searchParams.get("mode")==="quick") {
-    return render(hero("快速录入",link(root+"/new","选择录入方式"))+
-      '<form class="panel wardrobe-editor" action="'+root+'/intake" method="post"><label>描述衣物<textarea name="text" rows="4" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><button class="button">识别并核对</button></form>');
+    return render(hero("快速录入",link(root,"返回衣橱"),moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual"))+
+      '<form class="panel wardrobe-editor" action="'+root+'/intake" method="post"><label>描述衣物<textarea name="text" rows="4" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><div class="food-toolbar"><button class="button">提取信息</button>'+link(root,"取消","button secondary")+'</div></form>');
   }
   if(id)return page(row||{},row?wardrobeData(row):{});
   const q=url.searchParams.get("q")||"",archived=url.searchParams.get("status")==="archived";

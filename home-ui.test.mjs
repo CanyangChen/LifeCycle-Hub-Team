@@ -66,11 +66,13 @@ try {
   assert.equal((html.match(/data-quick-open/g)||[]).length,1);
   const picker=html.split('<dialog id="quick-entry"')[1].split('</dialog>')[0];
   assert.match(picker,/食品/);assert.match(picker,/药品/);assert.match(picker,/衣物/);
-  assert.doesNotMatch(picker,/设备|订阅/);
+  assert.match(picker,/电子设备/);
+  assert.ok(picker.includes('href="/items/device/new?mode=quick"'));
+  assert.ok(picker.includes('href="/items/subscription/new?mode=quick"'));
   assert.match(html,/<table class="subscription-table">/);
   assert.match(html,/class="subscription-due"/);
   assert.ok(html.indexOf('较早订阅')<html.indexOf('较晚订阅'));assert.doesNotMatch(html,/已删订阅/);
   assert.deepEqual(await db.prepare('SELECT COUNT(*) AS n FROM Item').first(),before);
-  for(const path of ['/items/clothing/new?mode=quick','/items/food/intake','/items/medicine/intake','/items/medicine/plans?id=current','/items/subscription/early','/items/device/new','/items/subscription/new']) assert.equal((await get(path)).status,200,path);
+  for(const path of ['/items/clothing/new?mode=quick','/items/food/intake','/items/medicine/intake','/items/medicine/plans?id=current','/items/subscription/early','/items/device/new','/items/device/new?mode=quick','/items/subscription/new']) assert.equal((await get(path)).status,200,path);
   console.log('PASS homepage empty states, fresh inventory, current plans, subscription order, deleted records, entry links and read-only item counts');
 } finally { database.close(); }

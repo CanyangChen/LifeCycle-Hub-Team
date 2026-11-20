@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';import {openDemoDatabase} from './standalone-db.mjs';import worker from './dist/server/index.js';
+const d=openDemoDatabase(':memory:'),origin='http://localhost',env={DB:d.DB,LOCAL_INSTANCE:true};
+const post=(path,data)=>worker.fetch(new Request(origin+path,{method:'POST',headers:{origin},body:new URLSearchParams(data)}),env);
+try{
+ const before=await d.DB.prepare("SELECT count(*) AS n FROM Item").first();
+ const review=await post('/items/subscription/new',{operation:'subscriptionExtract',timeZone:'Asia/Shanghai',text:'今天开通了音乐会员，每月25元，不自动续费，下次扣费日期2028年1月20日，取消截止日期2028年1月15日。'});
+ assert.equal(review.status,200);const html=await review.text();assert.ok(html.includes('确认保存订阅'));assert.ok(html.includes('value="25"'));assert.ok(html.includes('name="nextChargeOn" value="2028-01-20"'));assert.ok(html.includes('name="cancelBy" value="2028-01-15"'));assert.ok(html.includes('value="no" selected'));
+ assert.deepEqual(await d.DB.prepare('SELECT count(*) AS n FROM Item').first(),before);
+ const incomplete=await post('/items/subscription/new',{operation:'subscriptionExtract',text:'开通了视频会员，年付199元。'});assert.equal(incomplete.status,200);assert.ok((await incomplete.text()).includes('name="nextChargeOn" value=""'));
+ const fields={name:'订阅阶段测试',provider:'测试服务商',subscriptionCategory:'工具',startsOn:'2024-01-01',endsOn:'2029-01-01',nextChargeOn:'2028-01-01',billingInterval:'月',fee:'12.34',lifecycleStatus:'active'};
+ let r=await post('/items/subscription/new',fields);assert.equal(r.status,303);const path=r.headers.get('location').split('?')[0],id=path.split('/').at(-1);
+ let row=await d.DB.prepare('SELECT * FROM SubscriptionDetail WHERE itemId=?').bind(id).first();assert.equal(row.feeCents,1234);assert.equal(row.provider,'测试服务商');
+ const home=async()=>(await worker.fetch(new Request(origin+'/'),env)).text();assert.ok((await home()).includes('订阅阶段测试'));
+ assert.equal((await post(path,{...fields,lifecycleStatus:'paused'})).status,303);assert.ok(!(await home()).includes('订阅阶段测试'));
+ assert.equal((await post(path,{...fields,lifecycleStatus:'cancelled'})).status,303);assert.ok(!(await home()).includes('订阅阶段测试'));
+ assert.equal((await post(path,{...fields,lifecycleStatus:'bad'})).status,400);
+ assert.equal((await post(path,{...fields,startsOn:'2030-01-01'})).status,400);
+ assert.equal((await post(path,fields)).status,303);assert.ok((await home()).includes('订阅阶段测试'));
+ row=await d.DB.prepare('SELECT lifecycleStatus FROM SubscriptionDetail WHERE itemId=?').bind(id).first();assert.equal(row.lifecycleStatus,'active');
+ const noticeBefore=await d.DB.prepare('SELECT count(*) AS n FROM Notification').first();
+ await post(path,{...fields,cancelBy:'2028-01-01'});
+ let timeline=(await home()).split('id="recent-reminders"')[1];assert.ok(timeline.includes('取消通知截止'));assert.ok(timeline.includes('续费 / 扣费'));
+ await post(path,{...fields,cancelBy:'2027-12-15',nextChargeOn:'2028-02-01'});
+ timeline=(await home()).split('id="recent-reminders"')[1];assert.ok(!timeline.includes('2028-01-01'));assert.ok(timeline.includes('2028-02-01'));
+ assert.deepEqual(await d.DB.prepare('SELECT count(*) AS n FROM Notification').first(),noticeBefore);
+ const page=await (await worker.fetch(new Request(origin+'/items/subscription'),env)).text();assert.ok(page.includes('续费与取消提醒'));assert.ok(page.includes('2027-12-15'));
+ const get=async suffix=>(await worker.fetch(new Request(origin+suffix),env)).text();
+ assert.ok((await get('/items/subscription?lifecycle=active&q=订阅阶段')).includes('订阅阶段测试'));
+ assert.ok(!(await get('/items/subscription?lifecycle=paused')).includes('订阅阶段测试'));
+ await post(path,{...fields,lifecycleStatus:'cancelled'});
+ await post(path,{operation:'archive'});assert.ok(!(await home()).includes('订阅阶段测试'));
+ assert.ok((await get('/items/subscription?status=archived&lifecycle=cancelled')).includes('订阅阶段测试'));
+ assert.equal((await post(path,{operation:'restore'})).status,303);
+ assert.ok(!(await home()).includes('订阅阶段测试'));
+ assert.equal((await d.DB.prepare('SELECT lifecycleStatus FROM SubscriptionDetail WHERE itemId=?').bind(id).first()).lifecycleStatus,'cancelled');
+ await post(path,{operation:'restore'});assert.equal((await d.DB.prepare("SELECT count(*) AS n FROM LifecycleEvent WHERE itemId=? AND kind='restore'").bind(id).first()).n,1);
+ console.log('PASS subscription fields, price persistence, pause/cancel/resume home projection and invalid date/status rejection');
+}finally{d.close()}

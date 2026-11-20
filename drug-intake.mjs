@@ -204,7 +204,8 @@ function drugIntakeReview(draft,candidates,profiles,categories,locations,batches
 async function drugIntake(request,env,user,form) {
   const db=env.DB,hasAI=Boolean(env.OPENAI_API_KEY?.trim());
   const entry=(message="",status=200)=>intakeEntry(hasAI,message,status,{
-    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",foodButton(drugRoot+"/new","手动录入")),
+    cancelHref:drugRoot,
+    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",moduleEntry(drugRoot+"/intake",drugRoot+"/new")),
     placeholder:"今天买了一盒演示药品，24片，放在家庭药箱",
   });
   const path=new URL(request.url);

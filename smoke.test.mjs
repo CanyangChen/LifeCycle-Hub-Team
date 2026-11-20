@@ -18,6 +18,8 @@ sqlite.exec(readFileSync("drizzle/0008_drug_m3.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0009_food_portions.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0010_record_deletion.sql", "utf8"));
 sqlite.exec(readFileSync("drizzle/0013_wardrobe.sql", "utf8"));
+sqlite.exec(readFileSync("drizzle/0014_device_lifecycle.sql", "utf8"));
+sqlite.exec(readFileSync("drizzle/0015_subscription_lifecycle.sql", "utf8"));
 function statement(sql, params = []) {
   return {
     bind: (...values) => statement(sql, values),
@@ -84,7 +86,7 @@ for (const [spec, amount, unit] of [
   assert.deepEqual(parseQuantity(spec), { amount, unit }, spec);
 }
 for (const spec of ["250 mL", "1.5 瓶", "0 瓶"]) assert.equal(parseQuantity(spec), null, spec);
-assert.match(await html("/items/subscription/new"), /data-custom-cycle hidden/);
+assert.match(await html("/items/subscription/new?mode=manual"), /data-custom-cycle hidden/);
 for (const cycle of ["年", "季度", "月", "custom"]) {
   const response = await post("/items/subscription/new", { name: "会员", billingInterval: cycle, customCycle: "每两周" });
   assert.equal(response.status, 303);

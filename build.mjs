@@ -21,11 +21,15 @@ const demoMigrations = await Promise.all(journal.entries.filter(({tag}) => !/_de
   (await read("./drizzle/" + tag + ".sql")).split("--> statement-breakpoint").map((sql) => sql.trim()).filter(Boolean)));
 const demoWorkspaces = "const demoMigrations = " + JSON.stringify(demoMigrations) + ";\n" + await read("./demo-workspace.mjs");
 const wardrobe = await read("./wardrobe.mjs") + "\n" + await read("./wardrobe-intake.mjs");
+const subscriptionIntake = await read("./subscription-intake.mjs");
+const deviceIntake = await read("./device-intake.mjs");
 const worker = (await read("./worker.mjs"))
   .replace('import { catalog, styles, browser } from "./generated.mjs";', () => generated + "const requireDemoAuth = " + requireDemoAuth + ";\n")
   .replace('import { parseQuantity } from "./quantity.mjs";', () => quantity)
   .replace('import { allFoodRows, ensureFoodData, foodActive, foodTasks, foodTitle, foodRoute } from "./food.mjs";', () => food + "\n" + foodDates + "\n" + intake + "\n" + foodPortions)
   .replace('import { demoAuthRoute } from "./demo-auth.mjs";', () => demoAuth + "\n" + demoWorkspaces)
+  .replace('import { subscriptionExtract } from "./subscription-intake.mjs";', () => subscriptionIntake)
+  .replace('import { deviceExtract } from "./device-intake.mjs";', () => deviceIntake)
   .replace('import { wardrobeRoute } from "./wardrobe.mjs";', () => wardrobe)
   .replace('import { drugHomeData, drugRoute } from "./drug.mjs";', () => drugs);
 await mkdir("dist/server", { recursive: true });
