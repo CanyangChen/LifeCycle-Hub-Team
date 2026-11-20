@@ -247,7 +247,7 @@ async function drugNewPage(db,user,form,url) {
   const options=foodOption("","选择已有档案",requested)+profiles.map((r)=>foodOption(r.id,drugProfileTitle(r),requested)).join("")+
     foodOption("new","＋ 新建药品档案",requested);
   const clock=intakeClock("Asia/Shanghai");
-  return render(drugBack("新增药品批次","每次购买新建独立批次。",foodButton(drugRoot+"/intake","快速录入"))+
+  return render(drugBack("新增药品批次","每次购买新建独立批次。",moduleEntry(drugRoot+"/intake",drugRoot+"/new"))+
     foodForm('<div class="wide food-subhead"><h2>药品档案</h2></div>'+
       foodDropdown("drugId","选择药品",options,"required data-profile-picker")+
       `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${drugProfileFields({},categories,[])}</fieldset>
@@ -362,9 +362,9 @@ async function drugDashboard(db,user,url) {
   const metrics=[["药品档案",profiles.length],["当前库存批次",live.length],
     ["临近或超过期限",new Set(inventoryTasks.filter((t)=>t.title!=="达到设置的库存阈值").map((t)=>t.id)).size],
     ["已开封批次",live.filter((r)=>r.openedOn||r.status==="open").length]];
-  return render(hero("药品库存","管理包装有效期、批次和已核对的有效成分。",foodButton(drugRoot+"/intake","＋ 快速录入"))+
+  return render(hero("药品库存","管理包装有效期、批次和已核对的有效成分。",moduleEntry(drugRoot+"/intake",drugRoot+"/new"))+
     (q.has("deleted")?'<p class="notice" role="status">药品批次已删除。</p>':"")+
-    `<div class="food-toolbar">${foodButton(drugRoot+"/new","新增批次")}${link(drugRoot+"/profiles","药品档案与分类","button secondary")}
+    `<div class="food-toolbar">${link(drugRoot+"/profiles","药品档案与分类","button secondary")}
     ${link(drugRoot+"/locations","储存位置","button secondary")}${link(planRoot,"用药计划","button secondary")}${link(logRoot,"服用记录","button secondary")}
     ${link(safetyRoot,"药品安全提示","button secondary")}</div>
     <section class="food-metrics">${metrics.map(([label,n])=>`<div class="panel"><small>${label}</small><strong>${n}</strong></div>`).join("")}</section>

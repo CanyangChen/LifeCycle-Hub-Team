@@ -17,11 +17,7 @@ export function resolveFoodDates(text, day) {
   const durations=[...source.matchAll(new RegExp(`(?:保质期|保存期)\\s*(?:为|是|约|[:：])?\\s*(${count})\\s*[天日]`,"g"))].map((m)=>readCount(m[1]));
   const variants=[...new Set(durations)];
   const shelfLifeDays=variants.length===1&&validDays(variants[0])?variants[0]:null;
-  const baseMatches=[
-    /(?:从|自|按)生产(?:日期|日|当天)?(?:开始|起|计算)|生产(?:日期|日)起/,
-    /(?:从|自|按)(?:购买|购入)(?:日期|日|当天)?(?:开始|起|计算)|(?:购买|购入)(?:日期|日)起/,
-  ].map((rx)=>rx.test(source));
-  const shelfLifeBase=shelfLifeDays&&baseMatches[0]!==baseMatches[1]?(baseMatches[0]?"production":"purchase"):"";
+  const shelfLifeBase=shelfLifeDays?"production":"";
   const dates=[];
   const add=(value,kind,evidence)=>{
     dates.push({value:foodDate(value)?value:"",kind,evidence});
@@ -40,17 +36,25 @@ export function resolveFoodDates(text, day) {
       add(`${year||day.slice(0,4)}-${month.padStart(2,"0")}-${date.padStart(2,"0")}`,year?"stated":"year-confirm",match[0]);
     }
   }
+  const useBy = [...source.matchAll(new RegExp("("+count+")\\s*(?:天|日)(?:之)?内\\s*(?:要|得|需要|尽量|记得)?\\s*(?:吃完|喝完|用完|食用完)|(?:一周|一个星期)(?:之)?内\\s*(?:吃完|喝完|用完)", "g"))];
+  if (!dates.length) {
+    for (const match of useBy) {
+      const days = match[1] ? readCount(match[1]) : 7;
+      add(validDays(days)?foodAddDays(day,days):"", "consume-by", match[0]);
+    }
+  }
   const uniques=[...new Set(dates.map((entry)=>entry.value))];
   const production=source.match(new RegExp(`(?:生产(?:日期|日)?)(?:为|是|[:：])?\\s*${datePattern}(?![0-9])`));
   const producedOn=production?.[1]?`${production[1]}-${production[2].padStart(2,"0")}-${production[3].padStart(2,"0")}`:"";
   const resolved=uniques.length===1&&uniques[0]?dates[0]:null;
   const notes=[];
+  if (useBy.length) notes.push("已按用户描述计算到期日期，请核对。");
   if (dates.length&&!resolved) notes.push("到期日期无效或相互冲突，请确认。");
   if (!dates.length&&/到期|过期|有效期至/.test(source)) notes.push("到期日期尚未明确，请确认。");
   if (resolved?.kind==="year-confirm") notes.push(`原文没有指定年份，已按录入地的 ${day.slice(0,4)} 年预填，请核对年份。`);
   if (resolved?.kind==="relative") notes.push(`按录入地日期 ${day} 计算到期日期，请核对。`);
   if (variants.length&&!shelfLifeDays) notes.push("保质期天数无效或相互冲突，请确认。");
-  if (shelfLifeDays&&!shelfLifeBase&&!resolved) notes.push("已识别保质期天数，请核对从生产日还是购买日起算。");
+  if (shelfLifeDays&&!resolved&&!foodDate(producedOn)) notes.push("请补充生产日期以计算到期日期。");
   return {expiresOn:resolved?.value||"",expirySource:resolved?.kind||"",shelfLifeDays,shelfLifeBase,dateEvidence:notes.join(" "),
     producedOn:foodDate(producedOn)?producedOn:""};
 }

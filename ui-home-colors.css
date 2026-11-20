@@ -1,0 +1,51 @@
+/* Home V2.4 — Soft Layering, Medium. Tokens are scoped to home only. */
+body.personal-ui:has(.dashboard) {
+  --home-background:#F5F5FC;
+  --home-surface:#FFFFFF;
+  --home-surface-alt:#F1F2FA;
+  --home-border:#E4E6F0;
+  --home-brand-blue:#8299D6;
+  --home-brand-purple:#AC9BDE;
+  --home-brand-pink:#EFA9C9;
+  --home-blue-soft:#EBF0FC;
+  --home-purple-soft:#F1EDFB;
+  --home-pink-soft:#FCEEF5;
+  --home-lavender-soft:#EEF0FA;
+  --home-action:#4967AE;
+  --home-purple-strong:#7154AC;
+  --home-pink-strong:#A74776;
+  --home-text-primary:#30354C;
+  --home-text-secondary:#626B80;
+  --home-text-muted:#7A8296;
+  background:var(--home-background);
+}
+.personal-ui .dashboard { color:var(--home-text-primary); }
+.personal-ui .dashboard .hero { background:var(--home-blue-soft); }
+.personal-ui .dashboard .hero p,.personal-ui .dashboard .muted { color:var(--home-text-secondary); }
+.personal-ui .dashboard .panel,.personal-ui .dashboard-metrics { background:var(--home-surface); border-color:var(--home-border); }
+.personal-ui .dashboard-metric { background:transparent; }
+.personal-ui .dashboard-metric strong { color:var(--home-text-primary); }
+.personal-ui .dashboard-metric span { color:var(--home-text-secondary); }
+.personal-ui .dashboard .stat-icon-label .line-icon,.personal-ui .dashboard .icon-fresh-food .line-icon { color:var(--home-brand-blue); }
+.personal-ui .dashboard-metric:nth-child(3) .line-icon,.personal-ui .dashboard .icon-current-medication .line-icon { color:var(--home-brand-purple); }
+.personal-ui .dashboard-metric:nth-child(4) .line-icon,.personal-ui .dashboard .icon-subscription .line-icon { color:var(--home-brand-pink); }
+.personal-ui .dashboard #fresh-food > .dashboard-section-heading { background:var(--home-blue-soft); }
+.personal-ui .dashboard #current-medication > .dashboard-section-heading { background:var(--home-purple-soft); }
+.personal-ui .dashboard #fresh-food > .dashboard-list,.personal-ui .dashboard #current-medication > .dashboard-list { background:var(--home-surface); }
+.personal-ui .dashboard #active-subscriptions > .dashboard-section-heading { background:var(--home-surface); }
+.personal-ui .dashboard .subscription-table thead { background:var(--home-pink-soft); color:var(--home-text-primary); }
+.personal-ui .dashboard .subscription-table tbody { background:var(--home-surface); }
+.personal-ui .dashboard .subscription-table tbody tr { background:var(--home-surface); }
+.personal-ui .dashboard .subscription-table tbody tr:hover { background:var(--home-pink-soft); }
+.personal-ui .dashboard .subscription-table .subscription-due td:last-child { color:var(--home-pink-strong); }
+.personal-ui .dashboard .subscription-table th a { color:var(--home-pink-strong); }
+.personal-ui .dashboard .home-timeline { background:var(--home-lavender-soft); }
+.personal-ui .dashboard .home-timeline h2,.personal-ui .dashboard .icon-reminder .line-icon { color:var(--home-action); }
+.personal-ui .dashboard .timeline-date { background:var(--home-surface-alt); color:var(--home-text-secondary); }
+.personal-ui .dashboard .timeline-entry:hover { background:var(--home-purple-soft); }
+.personal-ui .dashboard .plan-state-taken { background:var(--home-purple-soft); color:var(--home-purple-strong); }
+.personal-ui .dashboard .button:not(.secondary) { background:var(--home-action); color:var(--home-surface); }
+.personal-ui .dashboard .button:not(.secondary):hover,.personal-ui .dashboard .button:not(.secondary):active { background:var(--home-purple-strong); }
+.personal-ui .dashboard :focus-visible { outline-color:var(--home-action); }
+.personal-ui .dashboard #quick-entry { background:var(--home-surface); color:var(--home-text-primary); border-color:var(--home-border); }
+.personal-ui .dashboard .quick-module-options a:hover { background:var(--home-blue-soft); border-color:var(--home-brand-blue); }

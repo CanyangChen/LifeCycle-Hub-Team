@@ -1,0 +1,84 @@
+/* Candidate personal UI tokens */
+:root {
+  /* Brand colors - candidate palette */
+  --color-primary: #8299D6;
+  --color-secondary: #AC9BDE;
+  --color-accent: #EFA9C9;
+
+  /* Interactive colors */
+  --color-action: #4967AE;
+  --color-purple-strong: #7154AC;
+  --color-pink-strong: #A74776;
+
+  /* Background */
+  --color-background: #FAF9FD;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F1F2FA;
+
+  /* Soft surfaces */
+  --color-blue-soft: #EBF0FC;
+  --color-purple-soft: #F1EDFB;
+  --color-pink-soft: #FCEEF5;
+
+  /* Typography */
+  --color-text-primary: #30354C;
+  --color-text-secondary: #626B80;
+  --color-text-muted: #7A8296;
+
+  /* Borders */
+  --color-border: #E4E6F0;
+
+  /* Status */
+  --color-success: #39856B;
+  --color-warning: #B37C28;
+  --color-danger: #C45E62;
+  --color-info: #5A83B6;
+
+  /* Typography */
+  --font-family:
+    Inter,
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 28px;
+
+  /* Spacing */
+  --space-unit: 4px;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-button: 12px;
+  --radius-card: 16px;
+  --radius-dialog: 20px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card:
+    0 2px 8px rgba(48, 53, 76, 0.035);
+
+  --shadow-floating:
+    0 8px 28px rgba(48, 53, 76, 0.12);
+
+  --shadow-drawer:
+    12px 0 40px rgba(48, 53, 76, 0.15);
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 220ms;
+  --ease-standard: ease;
+
+  /* Layout */
+  --content-max-width: 1280px;
+  --page-padding: 28px;
+  --drawer-width: 260px;
+
+  /* Buttons */
+  --button-height: 42px;
+}
+:root { --ink:var(--color-text-primary); --muted:var(--color-text-secondary); --line:var(--color-border); --accent:var(--color-action); --paper:var(--color-background); }

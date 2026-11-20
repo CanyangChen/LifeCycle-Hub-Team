@@ -152,3 +152,141 @@ for (const button of document.querySelectorAll("[data-intake-submit]")) {
     button.textContent="正在提取…";
   });
 }
+
+// Restore only short-lived UI state for an automatic GET filter navigation.
+const filterStateKey = "lifecycle-filter-ui";
+try {
+  const raw = sessionStorage.getItem(filterStateKey);
+  sessionStorage.removeItem(filterStateKey);
+  const state = raw ? JSON.parse(raw) : null;
+  if (state && state.url === location.href && Date.now() - state.time < 15000) {
+    const form = document.querySelectorAll("form.filters, [data-wardrobe-filters]")[state.formIndex];
+    const field = form?.elements.namedItem(state.name);
+    if (field instanceof HTMLElement) {
+      field.focus({preventScroll:true});
+      if (typeof field.setSelectionRange === "function" && Number.isInteger(state.start)) {
+        try { field.setSelectionRange(state.start,state.end); } catch {}
+      }
+    }
+    window.scrollTo(state.x,state.y);
+  }
+} catch { /* Storage restrictions must not prevent filtering. */ }
+// Reuse the existing GET filters, including all selected conditions.
+for (const form of document.querySelectorAll("form.filters, [data-wardrobe-filters]")) {
+  let timer;
+  let composing = false;
+  const submit = () => {
+    clearTimeout(timer);
+    if (!composing && form.checkValidity()) {
+      try {
+        const field = document.activeElement;
+        const target = new URL(form.action || location.href);
+        target.search = new URLSearchParams(new FormData(form)).toString();
+        target.hash = "";
+        sessionStorage.setItem(filterStateKey,JSON.stringify({
+          url:target.href,time:Date.now(),x:window.scrollX,y:window.scrollY,
+          formIndex:[...document.querySelectorAll("form.filters, [data-wardrobe-filters]")].indexOf(form),
+          name:form.contains(field)?field.name:"",start:field?.selectionStart,end:field?.selectionEnd
+        }));
+      } catch { /* Native GET submission remains the fallback. */ }
+      form.requestSubmit();
+    }
+  };
+  form.addEventListener("submit", () => clearTimeout(timer));
+  form.addEventListener("compositionstart", () => { composing = true; clearTimeout(timer); });
+  form.addEventListener("compositionend", () => { composing = false; timer = setTimeout(submit, 900); });
+  form.addEventListener("input", event => {
+    clearTimeout(timer);
+    if (!composing && event.target.matches('input:not([type=checkbox]):not([type=radio])')) timer = setTimeout(submit, 900);
+  });
+  form.addEventListener("change", event => {
+    if (event.target.matches('select, input[type=checkbox], input[type=radio]')) submit();
+  });
+}
+
+
+document.querySelectorAll("[data-food-expiry-mode]").forEach(select => {
+  const prefix = select.name.slice(0, -"expiryMode".length);
+  const form = select.form;
+  const preview = document.createElement("p");
+  preview.className = "food-muted";
+  preview.setAttribute("role","status");
+  select.closest("label").after(preview);
+  const update = () => {
+    for (const [field, visible] of [["expiresOn",select.value==="date"],["shelfLifeDays",select.value==="duration"]]) {
+      const input = form.elements.namedItem(prefix+field);
+      if (!input || input instanceof RadioNodeList) continue;
+      input.closest("label").hidden = !visible;
+      input.disabled = !visible;
+      input.required = visible && field==="shelfLifeDays";
+    }
+    const production = form.elements.namedItem(prefix+"producedOn");
+    if (production && !(production instanceof RadioNodeList)) production.required = select.value==="duration";
+    const days=form.elements.namedItem(prefix+"shelfLifeDays");
+    preview.textContent="";
+    if(select.value==="duration"){
+      const date=new Date(production?.value+"T12:00:00Z");
+      const count=Number(days?.value);
+      if(Number.isFinite(date.getTime()) && Number.isInteger(count) && count>0 && count<=36500){
+        date.setUTCDate(date.getUTCDate()+count);
+        preview.textContent="计算到期日期："+date.toISOString().slice(0,10);
+      }else preview.textContent="填写生产日期和保质期后自动计算到期日期。";
+    }
+  };
+  select.addEventListener("change",update);
+  form.elements.namedItem(prefix+"producedOn")?.addEventListener("input",update);
+  form.elements.namedItem(prefix+"shelfLifeDays")?.addEventListener("input",update);
+  update();
+});
+
+document.querySelectorAll("[data-food-open-state]").forEach(select => {
+  const input = select.form.querySelector("[data-food-open-date]");
+  if (!input) return;
+  const update = () => {
+    const opened = select.value === "opened";
+    input.closest("label").hidden = !opened;
+    input.disabled = !opened;
+    input.required = opened;
+    if (opened && !input.value) {
+      const now = new Date();
+      input.value = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    }
+  };
+  select.addEventListener("change",update);
+  update();
+});
+
+const appNavigation = document.querySelector("#app-navigation");
+const navigationTrigger = document.querySelector("[data-nav-open]");
+if (appNavigation && navigationTrigger) {
+  navigationTrigger.addEventListener("click", () => {
+    if (!appNavigation.open) appNavigation.showModal();
+    navigationTrigger.setAttribute("aria-expanded", "true");
+  });
+  document.querySelector("[data-nav-close]")?.addEventListener("click", () => appNavigation.close());
+  appNavigation.addEventListener("click", event => {
+    if (event.target !== appNavigation) return;
+    const box = appNavigation.getBoundingClientRect();
+    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) appNavigation.close();
+  });
+  appNavigation.addEventListener("close", () => {
+    navigationTrigger.setAttribute("aria-expanded", "false");
+    navigationTrigger.focus();
+  });
+  appNavigation.querySelectorAll("nav a").forEach(anchor => {
+    if (anchor.pathname === "/" ? location.pathname === "/" : location.pathname.startsWith(anchor.pathname)) anchor.setAttribute("aria-current", "page");
+  });
+}
+
+// Home module picker uses the same native modal behavior as the navigation.
+const quickDialog = document.querySelector('#quick-entry');
+const quickTrigger = document.querySelector('[data-quick-open]');
+if (quickDialog && quickTrigger) {
+  quickTrigger.addEventListener('click', () => quickDialog.showModal());
+  document.querySelector('[data-quick-close]')?.addEventListener('click', () => quickDialog.close());
+  quickDialog.addEventListener('click', event => {
+    const box = quickDialog.getBoundingClientRect();
+    if (event.target === quickDialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) quickDialog.close();
+  });
+  quickDialog.addEventListener('close', () => quickTrigger.focus());
+}

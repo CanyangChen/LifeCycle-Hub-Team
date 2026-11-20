@@ -1,3 +1,4 @@
+const intakeCleanSpeech = (text) => String(text ?? "").normalize("NFKC").trim().replace(/^(?:帮我记一下|帮我记录|记一下|记录)(?:一下)?\s*[:：]?\s*/, "");
 const foodRoot = "/items/food";
 const foodSubtypes = {
   produce: ["新鲜蔬菜水果", "叶菜类", "根茎类", "瓜果类", "浆果类", "其他水果"],
@@ -181,8 +182,8 @@ async function foodHome(db, url) {
     ["待检查批次",checks.length],["已开封批次",active.filter((r) => r.openedOn || r.packaging === "opened").length]];
   const badge = (r) => foodActive(r) && r.expiresOn && r.expiresOn < today
     ? "已超过"+foodExpiryLabel(r) : foodActive(r) ? foodPackages[r.packaging] : (r.archivedAt ? "已归档" : foodDispositions[r.disposition]);
-  return render(hero("食品库存", "查看每批食品的位置、库存与待处理事项。", foodButton(foodRoot+"/intake","＋ 快速记录"))
-    + `<div class="food-toolbar">${link(foodRoot+"/new","手动添加批次","button secondary")}${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理储存位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
+  return render(hero("食品库存", "查看每批食品的位置、库存与待处理事项。", moduleEntry(foodRoot+"/intake",foodRoot+"/new"))
+    + `<div class="food-toolbar">${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理储存位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
     <section class="food-metrics">${metrics.map(([label,count]) => `<div class="panel"><small>${label}</small><strong>${count}</strong></div>`).join("")}</section>
     <section><div class="section-heading"><h2>优先处理</h2></div>${taskBlock(tasks.filter((t) => t.kind === "expiry" || t.day <= today).slice(0,8))}</section>
     <section><div class="section-heading"><h2>储存位置</h2></div><div class="category-grid">${locations.map((r) =>
@@ -213,13 +214,24 @@ const foodFields = (form, specification, editing = false, source = "label") => {
   const remaining = get("remainingAmount") ? Number(get("remainingAmount")) : editing ? null : amount;
   const purchasedUnit = form.has("purchasedUnit") ? get("purchasedUnit") || null : unit;
   const note = get("amountNote");
+  if (form.has("openedState")) {
+    if (!["sealed","opened"].includes(get("openedState"))) return null;
+    if (get("openedState")==="sealed") {
+      form.set("openedOn","");
+      if (get("packaging")!=="portioned") form.set("packaging","sealed");
+    } else {
+      form.set("openedOn",get("openedOn") || intakeClock(get("timeZone") || "Asia/Shanghai").day);
+      form.set("packaging","opened");
+    }
+  }
   const requestedPackaging = get("packaging") || "sealed";
   const packaging = get("openedOn")&&requestedPackaging==="sealed" ? "opened" : requestedPackaging;
   const dates = ["purchasedOn","producedOn","expiresOn","openedOn","frozenOn"];
   const expiryLead = get("expiryLead") === "" ? null : Number(get("expiryLead"));
   const checkDays = get("checkDays") === "" ? null : Number(get("checkDays"));
-  const shelfLifeDays = get("shelfLifeDays")==="" ? null : Number(get("shelfLifeDays"));
-  const shelfLifeBase = get("shelfLifeBase");
+  const shelfLifeDays = get("expiryMode")==="date" || get("shelfLifeDays")==="" ? null : Number(get("shelfLifeDays"));
+  const mode = get("expiryMode");
+  const shelfLifeBase = mode === "duration" ? "production" : mode === "date" ? "" : get("shelfLifeBase");
   const baseDate = shelfLifeBase==="production" ? get("producedOn") : get("purchasedOn");
   const validAmount = (v) => v == null || (Number.isFinite(v) && v >= 0 && v <= 1000000);
   if (dates.some((key) => get(key) && !foodDate(get(key))) ||
@@ -255,10 +267,10 @@ const foodNumberAttrs = 'type="number" step="any" min="0" max="1000000"';
 const foodUnitInput = (name,value) => foodInput(name,"数量单位",value,'list="food-units" maxlength="20"') +
   `<datalist id="food-units">${foodUnits.map((u) => `<option value="${u}">`).join("")}</datalist>`;
 const foodShelfFields = (key,row) =>
-  foodInput(key("shelfLifeDays"),"保质期（天）",row?.shelfLifeDays,'type="number" min="1" max="36500" placeholder="按包装或用户描述填写"') +
-  foodDropdown(key("shelfLifeBase"),"保质期计算起点",
-    foodOption("","暂不计算（可手填到期日期）",row?.shelfLifeBase||"")+
-    foodOption("production","从生产日起算",row?.shelfLifeBase)+foodOption("purchase","从购买日起算",row?.shelfLifeBase));
+  foodDropdown(key("expiryMode"),"有效期填写方式",
+    foodOption("date","到期日期",row?.expirySource==="shelf" ? "duration" : row?.expiresOn ? "date" : row?.shelfLifeDays ? "duration" : "date")+
+    foodOption("duration","保质期",row?.expirySource==="shelf" ? "duration" : row?.expiresOn ? "date" : row?.shelfLifeDays ? "duration" : "date"),'data-food-expiry-mode')+
+  foodInput(key("shelfLifeDays"),"保质期（天，按生产日期自动计算）",row?.shelfLifeDays,'type="number" min="1" max="36500"');
 
 async function foodReferenceData(db) {
   return Promise.all([
@@ -283,15 +295,17 @@ function foodBatchFields(row, locations, editing = false) {
   return foodDropdown("locationId","储存位置",foodOptions(locations,row?.locationId || "unassigned"),"required") +
     foodInput("storage","储存方式与条件",row?.storage,'maxlength="240" placeholder="例如：密封、避光，核对包装说明"') +
     foodInput("batch","批次编号",row?.batch,'maxlength="240"') +
-    foodDropdown("packaging","包装状态",Object.entries(foodPackages).map(([k,v])=>foodOption(k,v,row?.packaging || "sealed")).join("")) +
+    foodDropdown("openedState","是否开封",
+      foodOption("sealed","未开封",row?.openedOn || row?.packaging==="opened" ? "opened" : "sealed")+
+      foodOption("opened","已开封",row?.openedOn || row?.packaging==="opened" ? "opened" : "sealed"),'data-food-open-state')+
+    (row?.packaging==="portioned" ? '<input type="hidden" name="packaging" value="portioned">' : "") +
     foodInput("purchasedOn","购买或制作日期",row?.purchasedOn,'type="date"'+(editing ? "" : " data-purchase-date")) +
     foodInput("purchaseTime","购买时间",row?.purchasedAtLocal?.slice(11) ?? "",'type="time"'+(editing ? "" : " data-purchase-time")) +
     `<input type="hidden" name="timeZone" value="${escape(row?.purchaseTimeZone || "Asia/Shanghai")}" ${editing ? "" : "data-intake-zone"}>` +
     foodInput("producedOn","生产日期",row?.producedOn,'type="date"') +
     foodInput("expiresOn","到期日期",row?.expiresOn,'type="date"') +
     foodShelfFields((key)=>key,row) +
-    foodInput("openedOn","开封日期",row?.openedOn,'type="date"') +
-    foodInput("frozenOn","冷冻日期",row?.frozenOn,'type="date"') +
+    foodInput("openedOn","开封日期",row?.openedOn,'type="date" data-food-open-date') +
     '<label>常用包装<select data-package-preset><option value="">自定义规格</option>' +
     presets.map((value)=>foodOption(value,value,row?.quantity)).join("") + '</select></label>' +
     `<div>${foodInput("quantity","包装规格",row?.quantity,'data-package-spec maxlength="240" placeholder="例如：2 箱 × 12 瓶"')}
@@ -377,7 +391,7 @@ async function foodNew(db, form) {
   }
   const [profiles,locations,categories] = await foodReferenceData(db);
   const choices = '<option value="" selected disabled>选择已有食品档案</option>'+foodOptions(profiles,"")+foodOption("new","＋ 新建食品档案","");
-  return render(foodBack("添加库存批次","每次购买单独记录。",foodButton(foodRoot+"/intake","快速记录")) +
+  return render(foodBack("添加库存批次","每次购买单独记录。",moduleEntry(foodRoot+"/intake",foodRoot+"/new")) +
     foodForm('<div class="wide food-subhead"><h2>食品档案</h2><p>这是什么食品？通常只需建一次。</p></div>' +
       foodDropdown("foodId","选择食品",choices,"required data-profile-picker") +
       `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${foodProfileFields(null,categories,true)}</fieldset>
@@ -492,9 +506,9 @@ async function foodDetailPage(db,row,url) {
     ${row.intakeInitialAmount!=null ? metric("消耗前库存",row.intakeInitialAmount+" "+row.intakeInitialUnit) : ""}
     ${metric("批次编号",row.batch)}${metric("生产日期",row.producedOn)}${metric("批次备注",row.notes)}
     ${metric(expiryLabel,row.expiresOn)}${metric("保质期",row.shelfLifeDays?row.shelfLifeDays+" 天":"")}
-    ${metric("计算起点",row.shelfLifeBase==="production"?"生产日":row.shelfLifeBase==="purchase"?"购买日":"")}
+
     ${metric("到期提醒开始日期",active?foodExpiryReminderOn(row):null)}
-    ${metric("开封日期",row.openedOn)}${metric("冷冻日期",row.frozenOn)}
+    ${metric("开封日期",row.openedOn)}
     ${metric(row.portionParentId?"上次检查（含来源批次）":"上次检查",row.checkedOn)}${metric("下次检查",row.checkDays ? foodAddDays(row.checkedOn || row.purchasedOn || row.createdAt.slice(0,10),row.checkDays) : null)}
     ${metric("储存说明",row.storageAdvice)}</dl>`;
   const operationInput = '<input type="hidden" name="operation" value="move">';
@@ -604,7 +618,7 @@ async function foodUpdateBatch(db,row,form,intake=null) {
     if (r("version") && r("version")!==row.updatedAt) return foodError("批次已有新变化，请重新打开编辑页面。",editPath,409);
     const current={...row,unit:row.stockUnit,purchaseTime:row.purchasedAtLocal?.slice(11),timeZone:row.purchaseTimeZone};
     for (const key of ["batch","quantity","storage","packaging","purchasedOn","purchaseTime","timeZone","producedOn",
-      "expiresOn","shelfLifeDays","shelfLifeBase","openedOn","frozenOn","purchasedAmount","purchasedUnit","remainingAmount",
+      "expiresOn","shelfLifeDays","shelfLifeBase","expiryMode","openedOn","frozenOn","purchasedAmount","purchasedUnit","remainingAmount",
       "unit","amountNote","disposition","expiryLead","checkDays","notes","locationId"]) {
       if (!form.has(key)) form.set(key,current[key]??"");
     }
@@ -666,11 +680,11 @@ async function foodUpdateBatch(db,row,form,intake=null) {
   return foodRedirect(back+"?saved=1");
 }
 
-const foodPurchaseLead = /^我?\s*(?:(?:今天|昨天|前天)\s*)?(?:刚刚|刚才|刚)?\s*(?:购买了?|买了?|购入了?|添了)/;
+const foodPurchaseLead = /^我?\s*(?:(?:今天|昨天|前天)\s*)?(?:刚刚|刚才|刚|刚买回来|又)?\s*(?:购买了?|买了?|购入了?|添了)/;
 const foodQuantityUnit = "千克|公斤|毫升|斤|克|升|个|颗|盒|袋|瓶|罐|桶|箱|包|片";
 function foodTextCandidates(text, locations, today) {
   const offset = {今天:0, 昨天:-1, 前天:-2};
-  return text.split(/[\n；;。]|和(?=[0-9一二两三四五六七八九十])/).map((v)=>v.trim()).filter(Boolean).slice(0,8).map((line) => {
+  return intakeCleanSpeech(text).split(/[\n；;。]|和(?=[0-9一二两三四五六七八九十])/).map((v)=>v.trim()).filter(Boolean).slice(0,8).map((line) => {
     const where = [...locations].sort((a,b)=>b.name.length-a.name.length).find((loc)=>line.includes(loc.name));
     const relative = Object.keys(offset).find((word)=>line.includes(word));
     const purchase = relative ? foodAddDays(today,offset[relative]) : "";

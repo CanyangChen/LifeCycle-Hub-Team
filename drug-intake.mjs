@@ -77,17 +77,17 @@ function drugPurchaseInstructions(line,prefix) {
 }
 function drugRuleRows(text,locations,clock) {
   const lines=[];
-  for (const part of text.split(/[；;。\n]+/).map((s)=>s.trim()).filter(Boolean)) {
+  for (const part of intakeCleanSpeech(text).split(/[；;。\n]+/).map((s)=>s.trim()).filter(Boolean)) {
     if (lines.length&&/^(?:实际|目前|现在)?(?:还剩|剩余|剩下)(?=\s*[0-9零一二两三四五六七八九十])/.test(part)&&
-      /^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚)?\s*(?:购买|买|购入)/.test(lines.at(-1))) {
+      /^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚才|刚)?\s*(?:购买|买|购入)/.test(lines.at(-1))) {
       lines[lines.length-1]+="，"+part;
     } else lines.push(part);
   }
   return lines.slice(0,8).map((line)=>{
     const place=[...locations].sort((a,b)=>b.name.length-a.name.length).find((p)=>line.includes(p.name));
-    const purchase=/^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚)?\s*(?:(?:购买|买|购入)了?)/.test(line);
+    const purchase=/^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚才|刚)?\s*(?:(?:购买|买|购入)了?)/.test(line);
     const relative=line.match(/今天|昨天|前天/);
-    const clause=line.replace(/^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚)?\s*(?:购买了?|买了?|购入了?|把|查询|查看)?/,"")
+    const clause=line.replace(/^(?:我\s*)?(?:(?:今天|昨天|前天)\s*)?(?:又|刚刚|刚才|刚)?\s*(?:购买了?|买了?|购入了?|把|查询|查看)?/,"")
       .split(/[，,]|放在|放入|购买日期|(?:已经|刚刚|刚|已)?开封|(?:还|剩)有|剩余|下个月|停止使用|(?:已|刚)?服用|到期/)[0].trim();
     const units="(毫升|毫克|千克|片|粒|袋|支|瓶|盒|克|包)";
     const count="([0-9]+(?:\\.[0-9]+)?|[一二两三四五六七八九十]+)";
@@ -204,7 +204,8 @@ function drugIntakeReview(draft,candidates,profiles,categories,locations,batches
 async function drugIntake(request,env,user,form) {
   const db=env.DB,hasAI=Boolean(env.OPENAI_API_KEY?.trim());
   const entry=(message="",status=200)=>intakeEntry(hasAI,message,status,{
-    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",foodButton(drugRoot+"/new","手动录入")),
+    cancelHref:drugRoot,
+    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",moduleEntry(drugRoot+"/intake",drugRoot+"/new")),
     placeholder:"今天买了一盒演示药品，24片，放在家庭药箱",
   });
   const path=new URL(request.url);
