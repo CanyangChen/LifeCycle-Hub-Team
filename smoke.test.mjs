@@ -124,6 +124,11 @@ const profile = sqlite.prepare("SELECT foodId FROM FoodDetail WHERE itemId=?").g
 const midRice = await createFood({foodId:profile,purchasedOn:relative(-45),locationId:"cupboard",purchasedAmount:"5",unit:"kg"});
 const lastRice = await createFood({foodId:profile,purchasedOn:relative(-5),locationId:"dry-cabinet",purchasedAmount:"5",unit:"kg"});
 assert.equal(sqlite.prepare("SELECT count(*) n FROM FoodDetail WHERE foodId=?").get(profile).n,3);
+assert.equal(sqlite.prepare("SELECT count(*) n FROM FoodItem WHERE id=?").get(profile).n,1);
+assert.equal(sqlite.prepare("SELECT remainingAmount FROM FoodDetail WHERE itemId=?").get(riceId).remainingAmount,2);
+assert.match(await html(midRice+"?added=1"),/已记录这次购买/);
+assert.match(await html(base+"/new"),/更多食品信息（选填，可稍后补充）/);
+
 assert.match(await inventory("?packaging=opened"), /验收大米/);
 assert.match(await html(midRice), /5 kg/);
 await go(midRice,{operation:"adjust",amount:"3",unit:"kg",amountNote:"约3kg"});
@@ -180,7 +185,13 @@ assert.doesNotMatch(await html(base+"/locations"), /备用储物区/);
 await go(base+"/profiles",{operation:"subcategory",parentId:"seasoning",childName:"自定义香辛料"});
 assert.match(await html(base+"/new"),/自定义香辛料/);
 assert.equal((await post(base+"/new",{name:"越权"},"https://other.test")).status,403);
-assert.match(await html(base+"/new"), /data-new-profile hidden disabled/);
+assert.match(await html(base+"/new"), /value="new" selected/);
+assert.doesNotMatch(await html(base+"/new"), /data-new-profile hidden disabled/);
+const refillProfile=sqlite.prepare("SELECT id FROM FoodItem WHERE deletedAt IS NULL LIMIT 1").get();
+const refillHtml=await html(base+"/new?foodId="+encodeURIComponent(refillProfile.id));
+assert.match(refillHtml,/data-new-profile hidden disabled/);
+assert.match(refillHtml,/确认补充库存/);
+assert.equal((await get(base+"/new?foodId=missing-food")).status,404);
 assert.match(await html(base), /到期日历/);
 assert.match(await html(base+"/intake"), /AI 服务未配置/);
 assert.equal((await post(base+"/intake",{method:"photo"})).status,503);
@@ -310,6 +321,8 @@ assert.equal(resolveFoodDates("生产日期2026年11月5日，保质期十天，
 const instantNoodles = await post(base+"/intake",{method:"text",text:"刚才买了两桶方便面，放在柜子里了",timeZone:"Asia/Shanghai"});
 assert.equal(instantNoodles.status,200);
 const noodlesCard = await instantNoodles.text();
+assert.match(noodlesCard,/fieldset class="panel editor component-form"/);
+assert.match(noodlesCard,/class="btn btn-primary">确认并保存/);
 assert.match(noodlesCard,/name="candidate-0-name"[^>]*value="方便面"/);
 assert.match(noodlesCard,/name="candidate-0-purchasedAmount"[^>]*value="2"/);
 assert.match(noodlesCard,/name="candidate-0-unit"[^>]*value="桶"/);
@@ -454,7 +467,10 @@ const portionParent=await createFood({name:"测试分装鸡肉",quantity:"",purc
 const portionId=portionParent.split("/").at(-1);
 const portionUrl=portionParent+"/portion";
 await go(portionParent,{operation:"check",checkedOn:relative(-1),inspectionNotes:"核对原包装"});
-const portionVersion=(await html(portionUrl)).match(/name="version" value="([^"]+)"/)?.[1];
+const portionPage=await html(portionUrl);
+assert.match(portionPage,/food-form component-form/);
+assert.match(portionPage,/class="back-link"[^>]*>[\s\S]*?返回批次/);
+const portionVersion=portionPage.match(/name="version" value="([^"]+)"/)?.[1];
 const portionsForm={version:portionVersion,"location-0":"freezer","quantity-0":"0.5","freeze-0":"yes","storage-0":"冷冻袋",
   "location-1":"drawer","quantity-1":"0.25"};
 assert.equal((await post(portionUrl,{...portionsForm,"quantity-0":"2"})).status,400);

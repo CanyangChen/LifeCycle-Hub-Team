@@ -73,3 +73,28 @@
   .personal-ui .stock-actions form { max-width:100%; }
   .personal-ui .hero > div:first-child { flex-basis:100%; }
 }
+/* Mode selection is centered; submit/cancel rows keep their existing layout. */
+.personal-ui .hero > .mode-switch { flex:1 0 100%; justify-content:center; width:100%; }
+@media(max-width:600px) { .personal-ui .hero > .mode-switch .button { flex:0 1 auto; } }
+.personal-ui .filter-summary { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin:10px 0; color:var(--muted); font-size:14px; }
+.personal-ui .filter-reset { color:var(--color-action); text-decoration:underline; text-underline-offset:3px; padding:6px 0; }
+.personal-ui .guided-empty { display:block; grid-column:1 / -1; }
+.personal-ui .guided-empty small { display:block; margin-top:6px; line-height:1.6; }
+.personal-ui .guided-empty .food-toolbar { margin-top:12px; }
+/* UI-006/007: shared entry actions, aligned to the content's right edge. */
+.personal-ui .hero > .mode-switch { justify-content:flex-end; gap:12px; }
+.personal-ui .mode-switch > .button { min-height:54px; min-width:148px; padding:12px 20px; font-size:17px; border-radius:14px; }
+.personal-ui .mode-switch > .button.secondary { min-width:136px; background:var(--btn-secondary-bg); border:1px solid var(--btn-secondary-border); color:var(--btn-secondary-text); }
+.personal-ui .mode-switch > .button:not(.secondary) { background:var(--btn-primary-bg); color:var(--btn-primary-text); }
+.personal-ui .mode-switch > .button.secondary:hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-secondary-bg-hover); border-color:var(--btn-secondary-border-hover); }
+.personal-ui .mode-switch > .button.secondary:active:not(:disabled):not([aria-disabled=true]) { background:var(--btn-secondary-bg-active); border-color:var(--btn-secondary-border-hover); box-shadow:none; }
+/* UI-009: explicit return links, with unchanged route targets. */
+.personal-ui .back-link { display:inline-flex; align-items:center; gap:7px; min-height:42px; padding:8px 14px; border-radius:12px; background:#EBF0FC; color:#4967AE; font-size:14px; vertical-align:middle; }
+.personal-ui .back-link .line-icon { width:19px; height:19px; }
+.personal-ui .back-link:hover { background:var(--state-hover-bg); color:var(--state-hover-text); }
+.personal-ui .back-link:active { box-shadow:inset 0 0 0 1px var(--color-action); }
+@media(max-width:380px) { .personal-ui .mode-switch > .button { padding-inline:14px; } }
+
+/* Food calendar: only the weekday heading row receives a blue surface. */
+.personal-ui #calendar .calendar-weekdays { grid-column:1 / -1; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:3px; padding:6px 0; border:1px solid var(--btn-secondary-border); border-radius:10px; background:var(--color-blue-soft); color:var(--color-action); }
+.personal-ui #calendar .calendar-weekdays > small { color:inherit; font-weight:600; }

@@ -3,7 +3,7 @@ function wardrobeTimeEditor(purchase, quick = false) {
   const day = wardrobeLocalDay();
   const exact = purchase?.precision === "day" ? purchase.value : "";
   const recognized = quick && purchase?.raw && purchase.precision !== "day";
-  return '<fieldset class="wide wardrobe-time"><legend>购买日期</legend>'+
+  return '<fieldset class="wide wardrobe-time"><legend>购入日期</legend>'+
     (recognized ? '<p>识别时间：'+escape(purchase.raw)+'（约）</p><input type="hidden" name="purchaseOriginal" value="'+escape(purchase.raw)+'">' : "")+
     '<label>选择年月日<input type="date" name="purchaseDay" max="'+day+'" value="'+escape(exact)+'"></label>'+
     '<input type="hidden" name="purchaseMode" value="'+(recognized?"quick":"manual")+'"></fieldset>';

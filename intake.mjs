@@ -96,12 +96,12 @@ function intakeMatch(candidate,profiles) {
   return {preferred:precise.length===1?precise[0].id:"",options:candidates.slice(0,12)};
 }
 function intakeEntry(hasAI, message="", status=200, context={}) {
-  const title=context.title||foodBack("快速记录","提供照片、录音或一句话，核对后保存。",moduleEntry(foodRoot+"/intake",foodRoot+"/new"));
+  const title=context.title||foodBack("快速记录","提供照片、录音或一句话，核对后保存。",moduleEntry(foodRoot+"/intake",foodRoot+"/new","quick"));
   const cancelHref=context.cancelHref||foodRoot;
   const placeholder=context.placeholder||"昨天买了两斤苹果，放在冰箱冷藏室";
   const tz='<input type="hidden" name="timeZone" data-intake-zone value="Asia/Shanghai">';
-  const form=(method,content,button)=>`<form class="panel editor" method="post" enctype="multipart/form-data">
-    ${intakeHidden("method",method)}${tz}<fieldset>${content}</fieldset><div class="food-toolbar"><button class="button" data-intake-submit>${button}</button>${link(cancelHref,"取消","button secondary")}</div></form>`;
+  const form=(method,content,button)=>`<form class="panel editor component-form" method="post" enctype="multipart/form-data">
+    ${intakeHidden("method",method)}${tz}<fieldset>${content}</fieldset><div class="food-toolbar"><button class="btn btn-primary" data-intake-submit>${button}</button>${entryButton(cancelHref,"取消","secondary")}</div></form>`;
   return render(title+(message?`<p class="notice error" role="alert">${escape(message)}</p>`:"")+
     (!hasAI?'<p class="notice">AI 服务未配置。可以使用文字规则提取或手动录入。</p>':"")+
     `<section><div class="section-heading"><h2>文字</h2></div>${form("text",
@@ -189,7 +189,7 @@ function intakeReview(draft,candidates,profiles,locations,categories,rows,transc
         : intakeHidden(key("foodId"),"new");
       const expiry=foodInput(key("expiresOn"),"到期日期",c.expiresOn,'type="date"');
       const duration=foodShelfFields(key,c);
-      purchases.push(`<fieldset class="panel editor"><legend>待确认 · ${index+1}</legend>
+      purchases.push(`<fieldset class="panel editor component-form"><legend>待确认 · ${index+1}</legend>
         <p class="wide food-muted">${match.preferred?"已匹配同名、同品牌和规格的档案。":match.options.length?"有相似档案，请确认匹配对象。":"将生成新食品档案与本次独立批次。"}</p>
         ${matching}
         ${foodInput(key("name"),"食品名称",c.name,'required maxlength="120"')}
@@ -230,7 +230,7 @@ function intakeReview(draft,candidates,profiles,locations,categories,rows,transc
     const fields=stockEdit?foodInput("amount",c.intent==="consume"?"消耗量":"调整后的剩余量",c.amount,foodNumberAttrs)+
       foodInput("unit","单位",c.unit,'maxlength="20"')+foodInput("amountNote","模糊数量",c.amountNote||"",'maxlength="240"'):"";
     const place=["move","open"].includes(c.intent)?foodDropdown("locationId","位置",foodOption("","保留原位置","")+foodOptions(locations,c.locationId==="unassigned"?"":c.locationId)):"";
-    actions.push(`<section><div class="section-heading"><h2>${intakeLabels[c.intent]} · ${escape(c.name)}</h2></div>${options.length?foodForm(
+    actions.push(`<section><div class="section-heading"><h2>${intakeLabels[c.intent]} · ${escape(c.name)}</h2></div>${options.length?foodModuleForm(
       intakeHidden("operation","apply-action")+intakeHidden("draft",draft.id)+intakeHidden("index",index)+
       foodDropdown("batchId","确认操作批次",foodOption("","请选择批次","")+options.map((r)=>foodOption(r.id,
         [foodTitle(r),r.locationName,r.purchasedOn,foodAmount(r)].filter(Boolean).join(" · "),"")).join(""),"required")+
@@ -238,7 +238,7 @@ function intakeReview(draft,candidates,profiles,locations,categories,rows,transc
   }
   return render(title+`<p class="notice">${draft.source==="rules"?"规则提取":"AI 提取"} · 日期、位置和数量请以实际情况为准。${transcript?" 转写："+escape(transcript):""}</p>`+
     (purchases.length?`<form class="food-confirm" method="post">${intakeHidden("operation","confirm")}${intakeHidden("draft",draft.id)}
-      ${purchases.join("")}<div class="food-toolbar"><button class="button">确认并保存</button>${link(foodRoot+"/intake","取消","button secondary")}</div></form>`:"")+actions.join(""));
+      ${purchases.join("")}<div class="food-toolbar"><button class="btn btn-primary">确认并保存</button>${entryButton(foodRoot+"/intake","取消","secondary")}</div></form>`:"")+actions.join(""));
 }
 
 function intakeClaim(db,id,index,now,guard="",keys=[]) {

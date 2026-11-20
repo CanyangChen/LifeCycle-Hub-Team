@@ -79,9 +79,9 @@ async function foodPortionPage(db,row,form) {
     foodInput("quantity-"+index,"分装数量（"+escape(row.stockUnit)+"）","",'type="number" min="0.000001" step="0.000001"'+(index?"":" required"))+
     foodInput("storage-"+index,"储存条件","",'maxlength="240" placeholder="留空沿用来源批次"')+
     `<label><span><input type="checkbox" name="freeze-${index}" value="yes"> 本份同时记录冷冻</span></label>`).join("");
-  return render(foodBack("分装库存批次",escape(foodTitle(row)),link(back,"返回批次","button secondary"))+
+  return render(foodBack("分装库存批次",escape(foodTitle(row)),backLink(back,"返回批次"))+
     `<p class="notice">可分装 ${escape(foodAmount(row))}。每份会成为独立批次，沿用来源的日期和提醒设置。</p>`+
-    foodForm(intakeHidden("version",row.updatedAt)+fields,"保存分装"));
+    foodModuleForm(intakeHidden("version",row.updatedAt)+fields,"保存分装"));
 }
 
 async function foodPortionLinks(db,row) {

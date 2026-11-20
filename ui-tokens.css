@@ -82,3 +82,78 @@
   --button-height: 42px;
 }
 :root { --ink:var(--color-text-primary); --muted:var(--color-text-secondary); --line:var(--color-border); --accent:var(--color-action); --paper:var(--color-background); }
+:root {
+  --btn-height-standard:54px;
+  --btn-width-entry:160px;
+  --btn-font-size:17px;
+  --btn-font-weight:600;
+  --btn-icon-size:18px;
+  --btn-icon-gap:8px;
+  --btn-radius:14px;
+  --btn-group-gap:12px;
+  --btn-primary-bg:#4967AE;
+  --btn-primary-bg-hover:#405D9F;
+  --btn-primary-bg-active:#354F91;
+  --btn-primary-border:#354F91;
+  --btn-primary-text:#FFFFFF;
+  --btn-secondary-bg:#FFFFFF;
+  --btn-secondary-bg-hover:#EBF0FC;
+  --btn-secondary-bg-active:#E2E9FA;
+  --btn-secondary-border:#AEBBD9;
+  --btn-secondary-border-hover:#8299D6;
+  --btn-secondary-text:#4967AE;
+  --btn-disabled-bg:#F1F2FA;
+  --btn-primary-disabled-bg:#C8CDDA;
+  --btn-disabled-border:#E4E6F0;
+  --btn-disabled-text:#7A8296;
+  --btn-focus-ring:0 0 0 3px rgba(73,103,174,0.25);
+  --btn-transition:150ms ease;
+}
+/* UI-014: shared interaction tokens. Component-specific button shades remain independent. */
+:root {
+  --state-hover-bg:#EBF0FC;
+  --state-hover-border:#8299D6;
+  --state-hover-text:#4967AE;
+  --state-selected-bg:#E8EEFC;
+  --state-selected-border:#8299D6;
+  --state-selected-text:#4967AE;
+  --state-active-bg:#E2E9FA;
+  --state-active-border:#8299D6;
+  --state-focus-color:#4967AE;
+  --state-focus-ring:0 0 0 3px rgba(73,103,174,0.25);
+  --state-disabled-bg:#F1F2FA;
+  --state-disabled-border:#E4E6F0;
+  --state-disabled-text:#7A8296;
+  --motion-fast:150ms;
+  --motion-normal:220ms;
+  --motion-easing:ease;
+  --state-card-shadow:0 2px 8px rgba(48,53,76,0.06);
+}
+:root {
+  --field-height:46px;
+  --field-radius:11px;
+  --field-border:#D8DCEE;
+  --field-hover-border:#AEBBD9;
+  --field-focus-border:#8299D6;
+  --field-gap:18px;
+  --card-background:#FFFFFF;
+  --card-border:#E4E6F0;
+  --card-radius:16px;
+  --card-padding:20px;
+  --card-gap:16px;
+  --text-page-title-size:26px;
+  --text-page-title-weight:700;
+  --text-page-title-color:#30354C;
+  --text-section-title-size:18px;
+  --text-section-title-weight:600;
+  --text-field-size:14px;
+  --text-field-weight:600;
+  --text-body-size:14px;
+  --text-body-color:#626B80;
+  --text-description-size:13px;
+  --text-description-color:#7A8296;
+  --text-button-size:17px;
+  --text-button-weight:600;
+  --text-status-size:12px;
+  --text-status-weight:600;
+}

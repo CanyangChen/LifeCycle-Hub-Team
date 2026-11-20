@@ -1,16 +1,17 @@
-/* Home V2.4 — Soft Layering, Medium. Tokens are scoped to home only. */
+/* Home V2.5 — Soft Layering, Medium. Tokens are scoped to home only. */
 body.personal-ui:has(.dashboard) {
-  --home-background:#F5F5FC;
+  --home-background:#F0F1F8;
   --home-surface:#FFFFFF;
-  --home-surface-alt:#F1F2FA;
-  --home-border:#E4E6F0;
+  --home-surface-alt:#EAEBF4;
+  --home-border:#D8DCEE;
+  --home-divider:#DDE0EC;
   --home-brand-blue:#8299D6;
   --home-brand-purple:#AC9BDE;
   --home-brand-pink:#EFA9C9;
-  --home-blue-soft:#EBF0FC;
-  --home-purple-soft:#F1EDFB;
-  --home-pink-soft:#FCEEF5;
-  --home-lavender-soft:#EEF0FA;
+  --home-blue-soft:#E8EEFC;
+  --home-purple-soft:#EEE9FA;
+  --home-pink-soft:#F9EAF2;
+  --home-lavender-soft:#E9EBF6;
   --home-action:#4967AE;
   --home-purple-strong:#7154AC;
   --home-pink-strong:#A74776;
@@ -36,16 +37,30 @@ body.personal-ui:has(.dashboard) {
 .personal-ui .dashboard .subscription-table thead { background:var(--home-pink-soft); color:var(--home-text-primary); }
 .personal-ui .dashboard .subscription-table tbody { background:var(--home-surface); }
 .personal-ui .dashboard .subscription-table tbody tr { background:var(--home-surface); }
-.personal-ui .dashboard .subscription-table tbody tr:hover { background:var(--home-pink-soft); }
+.personal-ui .dashboard .subscription-table tbody tr:hover { background:var(--state-hover-bg); }
 .personal-ui .dashboard .subscription-table .subscription-due td:last-child { color:var(--home-pink-strong); }
 .personal-ui .dashboard .subscription-table th a { color:var(--home-pink-strong); }
 .personal-ui .dashboard .home-timeline { background:var(--home-lavender-soft); }
 .personal-ui .dashboard .home-timeline h2,.personal-ui .dashboard .icon-reminder .line-icon { color:var(--home-action); }
 .personal-ui .dashboard .timeline-date { background:var(--home-surface-alt); color:var(--home-text-secondary); }
-.personal-ui .dashboard .timeline-entry:hover { background:var(--home-purple-soft); }
+.personal-ui .dashboard .timeline-entry:hover { background:var(--state-hover-bg); }
 .personal-ui .dashboard .plan-state-taken { background:var(--home-purple-soft); color:var(--home-purple-strong); }
 .personal-ui .dashboard .button:not(.secondary) { background:var(--home-action); color:var(--home-surface); }
-.personal-ui .dashboard .button:not(.secondary):hover,.personal-ui .dashboard .button:not(.secondary):active { background:var(--home-purple-strong); }
+.personal-ui .dashboard .button:not(.secondary):hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-primary-bg-hover); }
+.personal-ui .dashboard .button:not(.secondary):active:not(:disabled):not([aria-disabled=true]) { background:var(--btn-primary-bg-active); }
+.personal-ui .dashboard .button:not(.secondary):disabled { background:var(--btn-primary-disabled-bg); color:var(--state-disabled-text); }
 .personal-ui .dashboard :focus-visible { outline-color:var(--home-action); }
 .personal-ui .dashboard #quick-entry { background:var(--home-surface); color:var(--home-text-primary); border-color:var(--home-border); }
 .personal-ui .dashboard .quick-module-options a:hover { background:var(--home-blue-soft); border-color:var(--home-brand-blue); }
+
+/* Color-only overrides: preserve geometry and the shared interaction palette. */
+.personal-ui .dashboard :is(.dashboard-list > a,.dashboard-list .empty,.subscription-table th,.subscription-table td,.timeline-entry,.home-more) { border-color:var(--home-divider); }
+.personal-ui .dashboard-metric + .dashboard-metric,.personal-ui .dashboard-reminder-summary { border-color:var(--home-divider); }
+.personal-ui .dashboard :is(.dashboard-list small,.dashboard-list time,.dashboard-list .empty,.subscription-table small,.quick-module-options small,.dashboard-reminder-summary) { color:var(--home-text-secondary); }
+/* Secondary text narrowly misses AA on the purple/lavender surfaces. */
+.personal-ui .dashboard #current-medication > .dashboard-section-heading p,
+.personal-ui .dashboard .home-timeline :is(p,small,time,.timeline-date,.reminder-state:not(.overdue)) { color:var(--home-text-primary); }
+.personal-ui .dashboard .home-timeline .reminder-state:not(.overdue) { background:var(--home-surface-alt); }
+.personal-ui .dashboard .home-timeline .timeline-entry strong { color:var(--home-text-primary); }
+.personal-ui .dashboard .plan-state:not(.plan-state-taken):not(.plan-state-pending) { color:var(--home-text-secondary); background:var(--home-surface); }
+.personal-ui .dashboard .dashboard-list .dashboard-attention { color:#963A40; }

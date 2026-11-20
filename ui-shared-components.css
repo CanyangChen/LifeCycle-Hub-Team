@@ -1,0 +1,11 @@
+/* UI-012: shared form styles, applied only to explicitly opted-in components. */
+.personal-ui .component-form { padding:var(--card-padding); background:var(--card-background); border-color:var(--card-border); border-radius:var(--card-radius); }
+.personal-ui .component-form fieldset, .personal-ui fieldset.component-form { gap:var(--field-gap); }
+.personal-ui .component-form label { font-size:var(--text-field-size); font-weight:var(--text-field-weight); gap:8px; }
+.personal-ui .component-form :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select) { min-height:var(--field-height); border-radius:var(--field-radius); border-color:var(--field-border); font-size:var(--text-body-size); }
+.personal-ui .component-form textarea { border-radius:var(--field-radius); border-color:var(--field-border); font-size:var(--text-body-size); }
+.personal-ui .component-form h2 { font-size:var(--text-section-title-size); font-weight:var(--text-section-title-weight); }
+@media(hover:hover) { .personal-ui .component-form :is(input,select,textarea):hover:not(:disabled):not([readonly]) { border-color:var(--field-hover-border); } }
+.personal-ui .component-form :is(input,select,textarea):focus-visible { border-color:var(--field-focus-border); outline-color:var(--state-focus-color); box-shadow:var(--state-focus-ring); }
+.personal-ui .component-form :is(input,select,textarea):disabled { background:var(--state-disabled-bg); border-color:var(--state-disabled-border); color:var(--state-disabled-text); }
+@media(max-width:600px) { .personal-ui .component-form { padding:16px; } .personal-ui .component-form :is(input,select,textarea) { font-size:16px; } }

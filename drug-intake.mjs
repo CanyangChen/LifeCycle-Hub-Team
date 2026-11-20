@@ -161,7 +161,7 @@ function drugIntakeReview(draft,candidates,profiles,categories,locations,batches
         c.intent==="edit"?drugDateInput("expiresOn","包装有效期",c.expiresOn)+drugDateInput("purchasedOn","购买日期",c.purchasedOn)+
           (c.dateEvidence?`<p class="wide notice">${escape(c.dateEvidence)}</p>`:"")+
           '<label class="wide"><span><input type="checkbox" name="verified" value="yes" required> 日期已核对</span></label>':"";
-      return `<section><h2>${drugIntakeActions[c.intent]}</h2>${foodForm(hidden+
+      return `<section><h2>${drugIntakeActions[c.intent]}</h2>${drugModuleForm(hidden+
         foodDropdown("batchId","核对操作批次",foodOption("","请选批次","")+matching.map((r)=>foodOption(r.itemId,
           [drugTitle(r),r.lot,r.locationName,drugQuantity(r)].filter(Boolean).join(" · "),"")).join(""),"required")+fields,"确认更新")}</section>`;
     }
@@ -185,7 +185,7 @@ function drugIntakeReview(draft,candidates,profiles,categories,locations,batches
         notes:c.planDailyAmount&&!c.planDose?`自述每日总量 ${c.planDailyAmount} ${c.planDailyUnit}`:""},"plan_")+
       (c.planDurationDays?foodInput("plan_durationDays","疗程天数",c.planDurationDays,'type="number" min="1" max="3650"')+
       '<p class="wide food-muted">如创建此计划，请核对实际开始日期。结束日期按开始日计为第 1 天计算。</p>':""):"";
-    return `<section><div class="section-heading"><h2>核对药品 · ${index+1}</h2></div>${foodForm(hidden+select+
+    return `<section><div class="section-heading"><h2>核对药品 · ${index+1}</h2></div>${drugModuleForm(hidden+select+
       '<h3 class="wide">药品基础档案</h3>'+input(c)+'<h3 class="wide">本次库存批次</h3>'+
       drugDateInput("purchasedOn","购买日期",c.purchasedOn)+foodInput("purchaseTime","购买时间",c.purchaseTime,'type="time"')+
       intakeHidden("timeZone",c.timeZone)+drugDateInput("producedOn","生产日期",c.producedOn)+
@@ -205,7 +205,7 @@ async function drugIntake(request,env,user,form) {
   const db=env.DB,hasAI=Boolean(env.OPENAI_API_KEY?.trim());
   const entry=(message="",status=200)=>intakeEntry(hasAI,message,status,{
     cancelHref:drugRoot,
-    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",moduleEntry(drugRoot+"/intake",drugRoot+"/new")),
+    title:drugBack("药品快速录入","拍照、录音或输入一段描述，核对后入库。",moduleEntry(drugRoot+"/intake",drugRoot+"/new","quick")),
     placeholder:"今天买了一盒演示药品，24片，放在家庭药箱",
   });
   const path=new URL(request.url);

@@ -192,7 +192,7 @@ async function safetyWriteRule(db,user,form) {
   return foodRedirect(safetyRoot+"?drug="+encodeURIComponent(id)+"&saved=1");
 }
 function safetyRuleForm(current,selected,profiles) {
-  return foodForm(intakeHidden("revision",current?.revision||"")+
+  return drugModuleForm(intakeHidden("revision",current?.revision||"")+
     (current?intakeHidden("drugId",selected)+`<p class="wide"><strong>${escape(drugTitle(current))}</strong></p>`:
       foodDropdown("drugId","适用药品档案",foodOption("","选择药品档案",selected)+profiles.map((r)=>foodOption(r.id,drugProfileTitle(r),selected)).join(""),"required"))+
     foodDropdown("sourceType","来源类型",drugTypesOptions(safetySources,current?.sourceType||"prescription"))+
