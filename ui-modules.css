@@ -1,0 +1,75 @@
+/* Shared personal module presentation. Existing forms, actions and field names remain intact. */
+.personal-ui .module-entry { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.personal-ui .hero > div:first-child { min-width:0; flex:1 1 300px; }
+.personal-ui .hero > .module-entry { flex:0 1 auto; }
+.personal-ui .hero p { max-width:70ch; }
+.personal-ui .hero p a { color:var(--color-action); }
+.personal-ui .food-toolbar { gap:10px; margin-top:18px; }
+.personal-ui .food-toolbar > a:not(.button) { color:var(--color-action); text-decoration:underline; text-underline-offset:3px; }
+.personal-ui .section-heading { gap:12px; flex-wrap:wrap; margin:26px 0 12px; }
+.personal-ui .section-heading h2 { font-size:20px; }
+.personal-ui .food-metrics { gap:14px; margin-top:20px; }
+.personal-ui .food-metrics > div { padding:18px 20px; }
+.personal-ui .food-metrics strong { font-size:28px; font-variant-numeric:tabular-nums; margin-top:5px; }
+.personal-ui .filters { padding:18px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-card); gap:12px; align-items:end; }
+.personal-ui .filters label { gap:6px; color:var(--color-text-secondary); }
+.personal-ui .filters input,.personal-ui .filters select { max-width:100%; }
+.personal-ui .food-list > a,.personal-ui .food-list > div { padding:15px 20px; gap:16px; }
+.personal-ui .food-list > a:hover,.personal-ui .reminder-list > a:hover { background:var(--color-blue-soft); }
+.personal-ui .food-list small,.personal-ui .reminder-list small { margin-top:4px; line-height:1.6; }
+.personal-ui .food-list > a > span,.personal-ui .reminder-list > a > span { min-width:0; }
+.personal-ui .food-list time { color:var(--muted); font-size:13px; }
+.personal-ui .reminder-list > a { padding:15px 20px; }
+.personal-ui .empty { color:var(--color-text-secondary); padding:22px 20px; line-height:1.7; }
+.personal-ui .editor { padding:24px; margin-top:20px; }
+.personal-ui .editor fieldset { gap:18px; }
+.personal-ui .editor label { gap:7px; font-size:14px; }
+.personal-ui .editor input:not([type=checkbox]):not([type=radio]),.personal-ui .editor select,.personal-ui .editor textarea { width:100%; }
+.personal-ui textarea { resize:vertical; line-height:1.7; }
+.personal-ui input[type=checkbox],.personal-ui input[type=radio] { accent-color:var(--color-action); }
+.personal-ui .food-subhead { padding-top:18px; }
+.personal-ui .food-subhead h2 { margin-bottom:6px; }
+.personal-ui .food-details { gap:12px; padding:20px; }
+.personal-ui .food-details dt { font-size:13px; }
+.personal-ui .food-details dd { margin-top:5px; }
+.personal-ui .archive { border-top:1px solid var(--color-border); margin-top:18px; padding:18px 0; }
+.personal-ui summary { min-height:36px; padding:6px 0; }
+.personal-ui .notice { padding:16px 18px; line-height:1.7; }
+.personal-ui .calendar-day.has-event { background:var(--color-blue-soft); color:var(--color-action); }
+.personal-ui .wardrobe-card:hover { background:var(--color-blue-soft); }
+.personal-ui .wardrobe-editor .wardrobe-tags label { background:var(--color-surface-alt); }
+.personal-ui .wardrobe-editor .wardrobe-tags label:last-child { background:transparent; }
+.personal-ui .wardrobe-tags label:has(input:checked) { box-shadow:inset 0 0 0 1px var(--color-action); }
+.personal-ui .wardrobe-entry .wardrobe-card:first-child { border-color:var(--color-primary); background:var(--color-blue-soft); }
+.personal-ui .wardrobe-filter-grid { gap:18px; }
+.personal-ui .button:disabled { opacity:.55; cursor:not-allowed; }
+@media (max-width:600px) {
+  .personal-ui .module-entry { width:100%; }
+  .personal-ui .module-entry .button { flex:1; }
+  .personal-ui .editor { padding:18px; }
+  .personal-ui .filters { padding:14px; }
+  .personal-ui .food-list > a,.personal-ui .food-list > div,.personal-ui .reminder-list > a { padding:14px; gap:10px; }
+  .personal-ui .food-metrics { gap:10px; }
+  .personal-ui .food-metrics > div { padding:14px; }
+  .personal-ui .food-details { padding:16px; }
+  .personal-ui .food-toolbar .button { white-space:normal; text-align:center; }
+}
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+/* Keep long names, quantities and date controls inside narrow layouts. */
+.personal-ui main,.personal-ui main > section,.personal-ui .panel { min-width:0; }
+.personal-ui .hero,.personal-ui .food-details,.personal-ui .category { overflow-wrap:anywhere; }
+.personal-ui .editor label,.personal-ui .food-confirm fieldset > * { min-width:0; }
+.personal-ui .button { max-width:100%; }
+.personal-ui .food-list > a > strong { max-width:45%; text-align:right; overflow-wrap:anywhere; }
+@media (max-width:600px) {
+  .personal-ui input,.personal-ui select,.personal-ui textarea { font-size:16px; }
+  .personal-ui .filters > label { flex:1 1 140px; min-width:0; }
+  .personal-ui .food-list > a { flex-wrap:wrap; }
+  .personal-ui .reminder-list > a { grid-template-columns:auto minmax(0,1fr); }
+  .personal-ui .reminder-list time { grid-column:2; }
+  .personal-ui .dashboard-list > a:has(.marker) { grid-template-columns:8px minmax(0,1fr); }
+  .personal-ui .dashboard-list > a:has(.marker) time { grid-column:2; }
+  .personal-ui .dashboard-row-end { flex-shrink:1; }
+  .personal-ui .stock-actions form { max-width:100%; }
+  .personal-ui .hero > div:first-child { flex-basis:100%; }
+}

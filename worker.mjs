@@ -15,7 +15,10 @@ const stockOf = (detail) => detail?.stockCount == null
   ? parseQuantity(detail?.quantity)
   : { amount: detail.stockCount, unit: detail.stockUnit };
 const link = (href, title, cls = "") => `<a class="${cls}" href="${href}">${title}</a>`;
+const moduleIcons = {food:"refrigerator",medicine:"pill",clothing:"shirt",device:"laptop",subscription:"credit-card"};
+const uiIcon = (name) => uiIcons[name] || uiIcons.house;
 const hero = (title, description, action = "") => `<header class="hero"><div><h1>${title}</h1><p>${description}</p></div>${action}</header>`;
+const moduleEntry = (quick,manual) => `<div class="module-entry" role="group" aria-label="选择录入方式">${link(quick,"＋ 快速录入","button")}${link(manual,"手动录入","button secondary")}</div>`;
 function deleteControl(label,name,fields="") {
   return `<details class="archive"><summary>删除${label}</summary><form method="post">${fields}
     <p>确认删除「${escape(name)}」？删除后将从相应列表中移除。</p>
@@ -37,8 +40,8 @@ async function deleteItem(db,id,category,user=null) {
 }
 
 function render(content, status = 200) {
-  const nav = Object.entries(catalog).map(([key, meta]) => link("/items/" + key, meta.icon + " " + meta.title)).join("");
-  return new Response(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LifeCycle Hub · 课程演示</title><style>${styles}</style><script type="module" src="/assets/forms.js"></script><body><aside class="sidebar">${link("/", "<span>◎</span> LifeCycle Hub · 课程演示", "brand")}<nav aria-label="主导航">${link("/", "⌂ 总览")}${nav}</nav></aside><main>${content}</main></body></html>`, {
+  const nav = Object.entries(catalog).map(([key, meta]) => link("/items/" + key, uiIcon(moduleIcons[key]) + " " + meta.title)).join("");
+  return new Response(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LifeCycle Hub · 团队本地版</title><style>${styles}</style><script type="module" src="/assets/forms.js"></script><body class="personal-ui"><a class="skip-link" href="#main-content">跳到主要内容</a><header class="app-topbar"><button class="button secondary menu-button" type="button" data-nav-open aria-controls="app-navigation" aria-expanded="false">${uiIcon("menu")} 菜单</button>${link("/","LifeCycle Hub","brand")}</header><dialog id="app-navigation" class="app-drawer" aria-label="导航菜单"><div class="drawer-heading"><strong>LifeCycle Hub</strong><button class="button secondary" type="button" data-nav-close aria-label="关闭导航">${uiIcon("x")} 关闭</button></div><nav aria-label="主导航">${link("/",uiIcon("house")+" 总览")}${nav}</nav></dialog><main id="main-content" tabindex="-1">${content}</main></body></html>`, {
     status,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; form-action 'self'; base-uri 'none'" },
@@ -87,26 +90,69 @@ function writeDetail(db, category, id, fields, insertOnly = false) {
 }
 
 async function home(db,user) {
-  const [counts, reminders] = await db.batch([
-    db.prepare("SELECT category, count(*) AS count FROM Item WHERE archivedAt IS NULL AND category<>'medicine' GROUP BY category"),
+  const [counts, reminders, subscriptions] = await db.batch([
+    db.prepare("SELECT category, count(*) AS count FROM Item WHERE archivedAt IS NULL AND deletedAt IS NULL AND category<>'medicine' GROUP BY category"),
     db.prepare(`SELECT i.id, i.category, i.name, r.title, n.dueOn FROM Notification n
       JOIN ReminderRule r ON r.id=n.ruleId JOIN Item i ON i.id=r.itemId
-      WHERE n.status='pending' AND i.archivedAt IS NULL AND i.category NOT IN ('food','medicine') ORDER BY n.dueOn LIMIT 5`),
+      WHERE n.status='pending' AND i.archivedAt IS NULL AND i.deletedAt IS NULL AND i.category NOT IN ('food','medicine') ORDER BY n.dueOn`),
+    db.prepare(`SELECT i.id,i.name,s.* FROM Item i JOIN SubscriptionDetail s ON s.itemId=i.id
+      WHERE i.category='subscription' AND i.archivedAt IS NULL AND i.deletedAt IS NULL`),
   ]);
   const foods = await allFoodRows(db);
-  const drugs=await drugHomeData(db,user);
-  const pending = [...reminders.results,...drugs.tasks,...foodTasks(foods).map(({r,day,text})=>({id:r.id,category:"food",name:foodTitle(r),title:text,dueOn:day}))]
-    .sort((a,b)=>a.dueOn.localeCompare(b.dueOn)).slice(0,5).map((r) => link(r.href||`/items/${r.category}/${escape(r.id)}`,
-    `<span class="marker"></span><span><strong>${escape(r.name)}</strong><small>${escape(r.title)}</small></span><time>${escape(r.dueOn)}</time>`)).join("");
-  const categories = Object.entries(catalog).map(([key, meta]) => `<article class="panel category">
-    <span class="category-icon">${meta.icon}</span><h3>${link("/items/" + key, meta.title)}</h3><p>${meta.description}</p>
-    <div><span>${key === "food" ? foods.filter(foodActive).length : key === "medicine" ? drugs.rows.length : counts.results.find((r) => r.category === key)?.count ?? 0} ${(key === "food" || key === "medicine") ? "个在库批次" : "条档案"}</span>${link(`/items/${key}/new`, "＋ 新增")}</div></article>`).join("");
-  return render(hero("物品与服务总览", "查看手头的物品、常用设备和正在使用的订阅。", link("#categories", "＋ 新建档案", "button"))
-    + `<section><div class="section-heading"><h2>待处理提醒</h2></div><div class="panel reminder-list">${pending || '<p class="empty">暂无待处理提醒。</p>'}</div></section>
-    <section id="categories"><div class="section-heading"><h2>分类档案</h2></div><div class="category-grid">${categories}</div></section>
-    <section><div class="section-heading"><h2>快捷录入</h2></div><div class="intake-grid">
-    ${link("/items/food/intake","<strong>食品快速记录</strong><small>拍照、语音或文字</small>","panel intake")}
-    ${link("/items/medicine/intake","<strong>药品快速录入</strong><small>拍照、语音或文字</small>","panel intake")}</div></section>`);
+  const drugs = await drugHomeData(db,user);
+  const today = todayFood();
+  const activeFoods = foods.filter(foodActive);
+  const subscriptionTasks=subscriptions.results.flatMap(r=>{
+    const dates=[r.cancelBy,r.nextChargeOn,r.endsOn].filter(foodDate).sort();
+    return dates.length?[{id:r.id,category:"subscription",name:r.name,title:dates[0]===r.cancelBy?"确认是否取消订阅":dates[0]===r.nextChargeOn?"订阅即将扣费":"订阅到期",dueOn:dates[0]}]:[];
+  });
+  const taskMap=new Map();
+  for (const task of [...reminders.results,...drugs.tasks,...foodTasks(foods).map(({r,day,text})=>({id:r.id,category:"food",name:foodTitle(r),title:text,dueOn:day})),...subscriptionTasks]) {
+    const key=[task.category,task.href||task.id,task.dueOn.slice(0,10)].join("|");
+    if (!taskMap.has(key)) taskMap.set(key,task);
+  }
+  const tasks=[...taskMap.values()].sort((a,b)=>a.dueOn.localeCompare(b.dueOn));
+  const recent=tasks.filter(t=>t.dueOn.slice(0,10)<=foodAddDays(today,7));
+  const later=tasks.filter(t=>t.dueOn.slice(0,10)>foodAddDays(today,7));
+  const timelineRows=rows=>rows.map((r,index)=>{
+    const date=r.dueOn.slice(0,10),overdue=date<today;
+    const heading=index===0||rows[index-1].dueOn.slice(0,10)!==date?`<h3 class="timeline-date">${escape(date)}</h3>`:"";
+    return heading+link(r.href||`/items/${r.category}/${encodeURIComponent(r.id)}`,`<time>${escape(r.dueOn.slice(11)||"全天")}</time><span><strong>${escape(r.name)}</strong><small>${escape(catalog[r.category]?.title||"其他")} · ${escape(r.title)}</small></span><span class="reminder-state${overdue?" overdue":""}">${overdue?"已逾期":"待处理"}</span>`,"timeline-entry");
+  }).join("");
+  const timeline=timelineRows(recent.slice(0,8))+(recent.length>8||later.length?`<details class="home-more"><summary>展开更多事项（${Math.max(0,recent.length-8)+later.length}）</summary>${timelineRows([...recent.slice(8),...later])}</details>`:"");
+  // Home is a read-only projection of existing records and plan date rules.
+  const plans = user ? (await drugPlans(db,user)).filter(p=>planEffective(p,intakeClock(p.timeZone).day)) : [];
+  const fresh = activeFoods.filter(r => (foodDate(r.expiresOn) && r.expiresOn <= foodAddDays(today,3)) || ["produce","meat","dairy","prepared"].includes(r.parentId||r.categoryId) ||
+    (foodDate(r.producedOn)&&foodDate(r.expiresOn)&&r.expiresOn>=r.producedOn&&r.expiresOn<=foodAddDays(r.producedOn,7)))
+    .sort((a,b)=>(a.expiresOn||"9999").localeCompare(b.expiresOn||"9999"));
+  const freshRows = fresh.map(r=>{
+    const days=foodDate(r.expiresOn)?Math.round((Date.parse(r.expiresOn)-Date.parse(today))/86400000):null;
+    const urgency=days==null?"none":days<=1?"urgent":days===2?"soon":days===3?"watch":"none";
+    const label=days==null?"日期未记录":days<0?"已过期 "+(-days)+" 天":days===0?"今天到期":days+" 天后到期";
+    return link(foodHref(r),`<span><strong>${escape(foodTitle(r))}</strong><small>${escape(r.locationName||"位置未记录")}${r.packaging==="opened"?" · 已开封":""}</small></span><span class="dashboard-row-end"><strong>${escape(foodAmount(r))}</strong><small class="expiry-badge expiry-${urgency}">${escape(label)}</small>${r.expiresOn?`<small>${escape(r.expiresOn)}</small>`:""}</span>`);
+  });
+  const foodRows=freshRows.slice(0,6).join("")+(freshRows.length>6?`<details class="home-more"><summary>查看更多食品（${freshRows.length-6}）</summary><div class="dashboard-list">${freshRows.slice(6).join("")}</div></details>`:"");
+  const schedule=user?await drugSchedule(db,user,plans,{includeUntimed:true}):[];
+  const planRows = schedule.map(({p,time,state})=>{
+    const status=state?logStatuses[state]||"待确认":"时间未设置";
+    return link("/items/medicine/plans?id="+encodeURIComponent(p.id),`<time class="plan-time">${escape(time||"未定时")}</time><span><strong>${escape([p.name,p.tradeName].filter(Boolean).join(" · "))}</strong><small>${escape(p.dose==null?"剂量未记录":p.dose+" "+(p.unit||""))}${p.mealTiming?" · "+escape(p.mealTiming):""}</small><small>${escape(time||"未定时")} · ${escape(status)}</small></span><span class="plan-state plan-state-${escape(state||"unset")}">${escape(status)}</span>`,"home-plan-row");
+  }).join("");
+  const subscriptionDate = r => [r.cancelBy,r.nextChargeOn,r.endsOn].filter(foodDate).sort()[0]||"";
+  const subscriptionRows = subscriptions.results.sort((a,b)=>(subscriptionDate(a)||"9999").localeCompare(subscriptionDate(b)||"9999")).map(r=>{
+    const date=subscriptionDate(r),near=date&&date<=foodAddDays(today,7);
+    const status=r.cancelStatus|| (r.endsOn&&r.endsOn<today?"已到期":r.autoRenew?"自动续费":"在用");
+    return `<tr${near?' class="subscription-due"':""}><th scope="row">${link("/items/subscription/"+encodeURIComponent(r.id),escape(r.name))}</th><td>${r.feeCents!=null?"¥"+(r.feeCents/100).toFixed(2):"未记录"}<small>${escape(r.billingInterval||"周期未设置")}</small></td><td>${escape(date||"未设置")}<small>${date&&date===r.cancelBy?"取消提醒":date&&date===r.nextChargeOn?"下次扣费":"到期日期"}${near?" · 需关注":""}</small></td><td>${escape(status)}</td></tr>`;
+  }).join("");
+  const section = (id,title,description,href,rows,empty,action="查看全部 →") => `<section class="panel dashboard-section" id="${id}"><div class="dashboard-section-heading"><div><h2 class="home-icon-title icon-${id}">${uiIcon(id==="fresh-food"?"refrigerator":"pill")}${title}</h2><p class="muted">${description}</p></div>${link(href,action,"dashboard-text-link")}</div><div class="dashboard-list">${rows||`<p class="empty">${empty}</p>`}</div></section>`;
+  return render(`<div class="dashboard">`+hero("生活总览", "关注今天需要处理的事，让手头的物品有条不紊。", `<button class="button" type="button" data-quick-open aria-haspopup="dialog">${uiIcon("plus")}快速录入</button>`)+
+    `<div class="dashboard-metrics" aria-label="库存与计划概览">${[["在库食品",activeFoods.length,"/items/food"],["已开封食品",activeFoods.filter(r=>r.packaging==="opened").length,"/items/food?packaging=opened"],["当前用药计划",plans.length,"/items/medicine/plans"],["在用订阅",subscriptions.results.length,"/items/subscription"]].map(([label,count,href],index)=>link(href,`<span class="stat-icon-label">${uiIcon(["refrigerator","package-open","pill","credit-card"][index])}${label}</span><strong>${count}</strong>`,"panel dashboard-metric")).join("")}</div>
+    <a class="dashboard-reminder-summary" id="pending-reminders" href="#recent-reminders">待处理提醒 · ${tasks.length} 项<span>未来 7 天及逾期 ${recent.length} 项 · 查看近期事项 ↓</span></a>
+    <dialog id="quick-entry" class="quick-entry-dialog" aria-labelledby="quick-entry-title"><div class="drawer-heading"><div><h2 id="quick-entry-title">快速录入</h2><p class="muted">选择要记录的模块</p></div><button class="button secondary" type="button" data-quick-close aria-label="关闭快速录入">${uiIcon("x")} 关闭</button></div><div class="quick-module-options">${link("/items/food/intake","<strong>食品</strong><small>采购、消耗与储存</small>")}${link("/items/medicine/intake","<strong>药品</strong><small>购买、库存与用药信息</small>")}${link("/items/clothing/new?mode=quick","<strong>衣物</strong><small>购买时间与衣物标签</small>")}</div></dialog>
+    <div class="dashboard-columns">
+    ${section("fresh-food","短保与生鲜","生鲜、乳制品、熟食及已记录 7 天内保质期的食品。","/items/food",foodRows,"暂无短保或生鲜库存，添加后会显示在这里。")}
+    ${section("current-medication","当前用药计划","仅展示各计划时区内日期覆盖今天的进行中计划。","/items/medicine/plans",planRows,"今天没有进行中的用药计划。")}
+    <section class="panel dashboard-section" id="active-subscriptions"><div class="dashboard-section-heading"><h2 class="home-icon-title icon-subscription">${uiIcon("credit-card")}会员与订阅 <small>${subscriptions.results.length}</small></h2>${link("/items/subscription","管理订阅 →","dashboard-text-link")}</div><div class="subscription-table-wrap"><table class="subscription-table"><thead><tr><th>订阅</th><th>费用 / 周期</th><th>提醒日期</th><th>状态</th></tr></thead><tbody>${subscriptionRows||'<tr><td colspan="4" class="empty">暂无在用订阅。</td></tr>'}</tbody></table></div></section>
+    </div><section class="panel home-timeline" id="recent-reminders"><div class="dashboard-section-heading"><div><h2 class="home-icon-title icon-reminder">${uiIcon("calendar-clock")}近期提醒</h2><p class="muted">逾期及未来 7 天事项，按日期排列。</p></div></div>${timeline||'<p class="empty">近期暂无待处理事项。</p>'}</section></div>`);
 }
 
 async function list(db, category, url) {

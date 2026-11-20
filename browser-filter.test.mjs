@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+const source=readFileSync('browser.mjs','utf8');
+const block=source.slice(source.indexOf('// Restore only short-lived UI state'),source.indexOf('document.querySelectorAll("[data-food-expiry-mode]"'));
+let stored=null,submits=0,focused=false,selection,scroll,pending;
+const handlers={};class Element {}
+const field=Object.assign(new Element(),{name:'q',selectionStart:2,selectionEnd:2,focus(){focused=true},setSelectionRange(a,b){selection=[a,b]}});
+const form={action:'http://localhost/items/food',elements:{namedItem:()=>field},contains:()=>true,checkValidity:()=>true,requestSubmit(){submits++},addEventListener(k,f){handlers[k]=f}};
+const storage={getItem:()=>stored,removeItem(){stored=null},setItem(k,v){stored=v}};
+const context={document:{activeElement:field,querySelectorAll:()=>[form]},HTMLElement:Element,location:{href:'http://localhost/items/food'},sessionStorage:storage,window:{scrollX:0,scrollY:300,scrollTo(x,y){scroll=[x,y]}},URL,URLSearchParams,FormData:class extends URLSearchParams{constructor(){super('q=milk&status=active')}},setTimeout(f){pending=f;return 1},clearTimeout(){pending=null}};
+const run=()=>vm.runInNewContext(block,{...context});
+run();handlers.compositionstart();handlers.input({target:{matches:()=>true}});assert.equal(pending,null);
+handlers.compositionend();pending();assert.equal(submits,1);
+const state=JSON.parse(stored);assert.equal(state.url,'http://localhost/items/food?q=milk&status=active');
+context.location.href=state.url;run();assert.equal(focused,true);assert.deepEqual(selection,[2,2]);assert.deepEqual(scroll,[0,300]);assert.equal(stored,null);
+focused=false;stored=JSON.stringify({...state,time:Date.now()-20000});run();assert.equal(focused,false);
+stored=JSON.stringify({...state,url:'http://localhost/items/medicine'});run();assert.equal(focused,false);
+context.sessionStorage={getItem(){throw Error('blocked')},setItem(){throw Error('blocked')}};run();handlers.change({target:{matches:()=>true}});assert.equal(submits,2);
+console.log('PASS filter composition, combined query, focus, selection, scroll, expiry, destination and storage fallback');

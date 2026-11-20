@@ -182,8 +182,8 @@ async function foodHome(db, url) {
     ["待检查批次",checks.length],["已开封批次",active.filter((r) => r.openedOn || r.packaging === "opened").length]];
   const badge = (r) => foodActive(r) && r.expiresOn && r.expiresOn < today
     ? "已超过"+foodExpiryLabel(r) : foodActive(r) ? foodPackages[r.packaging] : (r.archivedAt ? "已归档" : foodDispositions[r.disposition]);
-  return render(hero("食品库存", "查看每批食品的位置、库存与待处理事项。", foodButton(foodRoot+"/intake","＋ 快速记录"))
-    + `<div class="food-toolbar">${link(foodRoot+"/new","手动添加批次","button secondary")}${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理储存位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
+  return render(hero("食品库存", "查看每批食品的位置、库存与待处理事项。", moduleEntry(foodRoot+"/intake",foodRoot+"/new"))
+    + `<div class="food-toolbar">${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理储存位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
     <section class="food-metrics">${metrics.map(([label,count]) => `<div class="panel"><small>${label}</small><strong>${count}</strong></div>`).join("")}</section>
     <section><div class="section-heading"><h2>优先处理</h2></div>${taskBlock(tasks.filter((t) => t.kind === "expiry" || t.day <= today).slice(0,8))}</section>
     <section><div class="section-heading"><h2>储存位置</h2></div><div class="category-grid">${locations.map((r) =>
