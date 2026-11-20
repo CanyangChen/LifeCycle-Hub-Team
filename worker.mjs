@@ -16,7 +16,7 @@ const legacyCycle = { 每年: "年", 每季度: "季度", 季: "季度", 每季:
 const stockOf = (detail) => detail?.stockCount == null
   ? parseQuantity(detail?.quantity)
   : { amount: detail.stockCount, unit: detail.stockUnit };
-const link = (href, title, cls = "") => `<a class="${cls}" href="${href}">${title}</a>`;
+const link = (href, title, cls = "", attrs = "") => `<a class="${cls}" href="${href}"${attrs?" "+attrs:""}>${title}</a>`;
 const subscriptionStatuses = {active:"使用中",paused:"已暂停",cancelled:"已取消"};
 const subscriptionDue = rows => rows.filter(r=>!r.lifecycleStatus||r.lifecycleStatus==="active").flatMap(r=>[
   ["cancel-notice",r.cancelBy,"取消通知截止"],
@@ -26,8 +26,21 @@ const subscriptionDue = rows => rows.filter(r=>!r.lifecycleStatus||r.lifecycleSt
 const deviceStatuses = {using:"使用中",idle:"闲置",repair:"维修中",retired:"已停用"};
 const moduleIcons = {food:"refrigerator",medicine:"pill",clothing:"shirt",device:"laptop",subscription:"credit-card"};
 const uiIcon = (name) => uiIcons[name] || uiIcons.house;
+const emptyInventory = (message,base,label,description="可以调整上方条件查看已有记录，或添加新内容。可选信息可以稍后补充。") => `<div class="empty guided-empty"><p>${escape(message)}</p><small>${escape(description)}</small><div class="food-toolbar">${link(base+"/new",escape(label),"button secondary")}</div></div>`;
+const filterSummary = (count,href,params) => {
+  const active=[...params.entries()].filter(([key,value])=>["q","category","location","packaging","status","sort","usage","warranty","lifecycle","kind","material","frequency","weather","care","temperature"].includes(key)&&value&&!(key==="status"&&value==="active")&&!(key==="sort"&&["updated","expiry"].includes(value)));
+  return `<div class="filter-summary" role="status"><span>找到 <strong>${count}</strong> 条结果${active.length?` · 已应用 ${active.length} 项条件`:""}</span>${active.length?link(href,"清除筛选","filter-reset"):""}</div>`;
+};
+const backLink = (href,label) => link(href,uiIcon("arrow-left")+`<span>${escape(label)}</span>`,"back-link");
 const hero = (title, description, action = "") => `<header class="hero"><div><h1>${title}</h1><p>${description}</p></div>${action}</header>`;
-const moduleEntry = (quick,manual) => `<div class="module-entry" role="group" aria-label="选择录入方式">${link(quick,"＋ 快速录入","button")}${link(manual,"手动录入","button secondary")}</div>`;
+const entryButton = (href,label,variant="primary",disabled=false) => disabled
+  ? `<span class="btn btn-${variant}" role="link" aria-disabled="true">${label}</span>`
+  : link(href,label,"btn btn-"+variant);
+const moduleEntry = (quick,manual,active="") => {
+  const standard=["/items/food/","/items/medicine/","/items/clothing/","/items/device/","/items/subscription/"].some(prefix=>quick.startsWith(prefix));
+  const button=(href,label,variant)=>standard?entryButton(href,label,variant):link(href,label,variant==="primary"?"button":"button secondary");
+  return `<div class="module-entry mode-switch${standard?" entry-actions":""}" role="group" aria-label="选择录入方式">${active==="quick"?"":button(quick,(standard?uiIcon("plus"):"＋ ")+"快速录入","primary")}${active==="manual"?"":button(manual,"手动录入","secondary")}</div>`;
+};
 function deleteControl(label,name,fields="") {
   return `<details class="archive"><summary>删除${label}</summary><form method="post">${fields}
     <p>确认删除「${escape(name)}」？删除后将从相应列表中移除。</p>
@@ -155,7 +168,7 @@ async function home(db,user) {
     <a class="dashboard-reminder-summary" id="pending-reminders" href="#recent-reminders">待处理提醒 · ${tasks.length} 项<span>未来 7 天及逾期 ${recent.length} 项 · 查看近期事项 ↓</span></a>
     <dialog id="quick-entry" class="quick-entry-dialog" aria-labelledby="quick-entry-title"><div class="drawer-heading"><div><h2 id="quick-entry-title">快速录入</h2><p class="muted">选择要记录的模块</p></div><button class="button secondary" type="button" data-quick-close aria-label="关闭快速录入">${uiIcon("x")} 关闭</button></div><div class="quick-module-options">${link("/items/food/intake","<strong>食品</strong><small>采购、消耗与储存</small>")}${link("/items/medicine/intake","<strong>药品</strong><small>购买、库存与用药信息</small>")}${link("/items/clothing/new?mode=quick","<strong>衣物</strong><small>购买时间与衣物标签</small>")}${link("/items/device/new?mode=quick","<strong>电子设备</strong><small>购买、配置与保修信息</small>")}${link("/items/subscription/new?mode=quick","<strong>会员订阅</strong><small>费用、周期与续费日期</small>")}</div></dialog>
     <div class="dashboard-columns">
-    ${section("fresh-food","短保与生鲜","生鲜、乳制品、熟食及已记录 7 天内保质期的食品。","/items/food",foodRows,"暂无短保或生鲜库存，添加后会显示在这里。")}
+    ${section("fresh-food","短保与生鲜","生鲜、乳制品、熟食及已记录 7 天内保质期的食品。","/items/food",foodRows,"暂无食品库存记录。")}
     ${section("current-medication","当前用药计划","仅展示各计划时区内日期覆盖今天的进行中计划。","/items/medicine/plans",planRows,"今天没有进行中的用药计划。")}
     <section class="panel dashboard-section" id="active-subscriptions"><div class="dashboard-section-heading"><h2 class="home-icon-title icon-subscription">${uiIcon("credit-card")}会员与订阅 <small>${subscriptions.results.length}</small></h2>${link("/items/subscription","管理订阅 →","dashboard-text-link")}</div><div class="subscription-table-wrap"><table class="subscription-table"><thead><tr><th>订阅</th><th>费用 / 周期</th><th>提醒日期</th><th>状态</th></tr></thead><tbody>${subscriptionRows||'<tr><td colspan="4" class="empty">暂无在用订阅。</td></tr>'}</tbody></table></div></section>
     </div><section class="panel home-timeline" id="recent-reminders"><div class="dashboard-section-heading"><div><h2 class="home-icon-title icon-reminder">${uiIcon("calendar-clock")}近期提醒</h2><p class="muted">逾期及未来 7 天事项，按日期排列。</p></div></div>${timeline||'<p class="empty">近期暂无待处理事项。</p>'}</section></div>`);
@@ -168,6 +181,8 @@ async function list(db, category, url) {
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 120);
   const { results } = await db.prepare(`SELECT id,name,notes FROM Item WHERE category=? AND deletedAt IS NULL AND
     archivedAt IS ${archived ? "NOT " : ""}NULL AND instr(lower(name), lower(?)) > 0 ORDER BY updatedAt DESC`).bind(category, query).all();
+  const scopeCount = await db.prepare(`SELECT count(*) AS n FROM Item WHERE category=? AND deletedAt IS NULL AND archivedAt IS ${archived ? "NOT " : ""}NULL`).bind(category).first();
+  const emptyMessage = scopeCount.n ? "无匹配结果。" : archived ? "暂无已归档记录。" : category === "device" ? "暂无设备记录。" : "暂无订阅记录。";
   const subscriptionFilter=category==="subscription"?url.searchParams.get("lifecycle")||"":"";
   const subscriptionRows=category==="subscription"?await foodAll(db,"SELECT i.id,i.name,s.* FROM SubscriptionDetail s JOIN Item i ON i.id=s.itemId WHERE i.deletedAt IS NULL"):[];
   const subscriptionReminders=category==="subscription"&&!archived?subscriptionDue(subscriptionRows.filter(r=>results.some(i=>i.id===r.id)&&(!subscriptionFilter||(r.lifecycleStatus||"active")===subscriptionFilter))):[];
@@ -191,16 +206,17 @@ async function list(db, category, url) {
     (url.searchParams.has("deleted") ? '<p class="notice" role="status">档案已删除。</p>' : "") +
     (url.searchParams.has("archived") ? '<p class="notice" role="status">档案已归档。</p>' : "") +
     `<form class="filters"><input name="q" aria-label="按名称搜索" placeholder="按名称搜索" value="${escape(query)}"><select name="status" aria-label="档案状态"><option value="active">在用档案</option><option value="archived" ${archived ? "selected" : ""}>已归档</option></select>${category==="subscription"?`<select name="lifecycle" aria-label="订阅使用状态">${[["","全部使用状态"],...Object.entries(subscriptionStatuses)].map(([value,label])=>`<option value="${value}"${value===subscriptionFilter?" selected":""}>${label}</option>`).join("")}</select>`:""}${category==="device"?`<select name="usage" aria-label="设备使用状态">${[["","全部使用状态"],["unknown","状态未记录"],...Object.entries(deviceStatuses)].map(([value,label])=>`<option value="${value}"${value===usageFilter?" selected":""}>${label}</option>`).join("")}</select><select name="warranty" aria-label="保修状态">${[["","全部保修状态"],["valid","保修期内"],["expired","已过保"],["unknown","日期未记录"]].map(([value,label])=>`<option value="${value}"${value===warrantyFilter?" selected":""}>${label}</option>`).join("")}</select>`:""}<button class="button secondary">筛选</button></form>
-    <div class="panel reminder-list">${records || '<p class="empty">暂无匹配档案。</p>'}</div>${reminderPanel}`);
+    ${filterSummary(filtered.length,base,url.searchParams)}<div class="panel reminder-list">${records || emptyInventory(emptyMessage,base,category==='device'?'添加设备':'添加订阅',scopeCount.n?'请调整或清除筛选条件。':'可通过快速录入或手动录入添加记录。')}</div>${reminderPanel}`);
 }
 
 function editor(category, id, item, detail, flags = {}) {
   const base = "/items/" + category;
   const meta = catalog[category];
+  const sharedForm = ["device", "subscription"].includes(category);
   const input = (key, label, value = "", kind = "text", opts = "") =>
     `<label>${label}<input name="${key}" value="${escape(value)}" type="${kind}" ${opts}></label>`;
   const inputs = Object.entries(meta.fields).filter(([key]) => !["quantity", "billingInterval", ...(category==="device"?["usageStatus"]:[]),...(category==="subscription"?["lifecycleStatus"]:[])].includes(key))
-    .map(([key, label]) => input(key, label, detail[key], dateField(key) ? "date" : "text", 'maxlength="240"')).join("");
+    .map(([key, label]) => input(key, category==="device"&&key==="purchasedOn"?"购入日期":label, detail[key], dateField(key) ? "date" : "text", 'maxlength="240"')).join("");
   const savedCycle = detail.billingInterval ?? "";
   const cycle = Object.hasOwn(legacyCycle, savedCycle) ? legacyCycle[savedCycle] : savedCycle;
   const custom = flags.customCycle ? savedCycle : Object.hasOwn(cycles, cycle) ? "" : cycle;
@@ -214,14 +230,14 @@ function editor(category, id, item, detail, flags = {}) {
   const deviceFields=category==="device"?`<label>使用状态<select name="usageStatus"><option value="">未记录</option>${Object.entries(deviceStatuses).map(([value,label])=>`<option value="${value}"${detail.usageStatus===value?" selected":""}>${label}</option>`).join("")}</select></label>`+input("purchasePrice","购买价格（元，选填）",detail.purchasePrice??(detail.purchasePriceCents==null?"":detail.purchasePriceCents/100),"number",'min="0" max="9999999.99" step="0.01"'):"";
   const warrantyDays=foodDate(detail.warrantyUntil)?Math.round((Date.parse(detail.warrantyUntil)-Date.parse(todayFood()))/86400000):null;
   const deviceSummary=category==="device"&&id!=="new"?`<div class="notice"><strong>${escape(deviceStatuses[detail.usageStatus]||"使用状态未记录")}</strong> · ${warrantyDays==null?"保修日期未记录":warrantyDays<0?"已过保 "+(-warrantyDays)+" 天":warrantyDays===0?"保修今天到期":"保修剩余 "+warrantyDays+" 天"}${detail.warrantyUntil?"（"+escape(detail.warrantyUntil)+"）":""}</div>`:"";
-  const deviceHistory=category==="device"&&id!=="new"?`<section><div class="section-heading"><h2>维修与维护记录</h2></div><div class="panel food-list">${(flags.deviceEvents||[]).map(event=>`<div><span><strong>${escape(event.kind==="deviceRepair"?"维修":"维护")}</strong><small>${escape(event.notes)}</small></span><time>${escape(event.occurredAt.slice(0,10))}</time></div>`).join("")||'<p class="empty">暂无维修或维护记录。</p>'}</div>${item.archivedAt?'<p class="archive">已归档设备仅保留维护历史。</p>':`<form class="panel editor" method="post"><input type="hidden" name="operation" value="deviceMaintenance"><input type="hidden" name="eventId" value="${crypto.randomUUID()}"><fieldset><label>类型<select name="kind"><option value="deviceMaintenance">维护</option><option value="deviceRepair">维修</option></select></label>${input("occurredOn","发生日期",todayFood(),"date","required")}<label class="wide">处理内容<textarea name="maintenanceNotes" rows="3" maxlength="2000" required></textarea></label></fieldset><button class="button">保存记录</button></form>`}</section>`:"";
+  const deviceHistory=category==="device"&&id!=="new"?`<section><div class="section-heading"><h2>维修与维护记录</h2></div><div class="panel food-list">${(flags.deviceEvents||[]).map(event=>`<div><span><strong>${escape(event.kind==="deviceRepair"?"维修":"维护")}</strong><small>${escape(event.notes)}</small></span><time>${escape(event.occurredAt.slice(0,10))}</time></div>`).join("")||'<p class="empty">暂无维修或维护记录。</p>'}</div>${item.archivedAt?'<p class="archive">已归档设备仅保留维护历史。</p>':`<form class="panel editor component-form" method="post"><input type="hidden" name="operation" value="deviceMaintenance"><input type="hidden" name="eventId" value="${crypto.randomUUID()}"><fieldset><label>类型<select name="kind"><option value="deviceMaintenance">维护</option><option value="deviceRepair">维修</option></select></label>${input("occurredOn","发生日期",todayFood(),"date","required")}<label class="wide">处理内容<textarea name="maintenanceNotes" rows="3" maxlength="2000" required></textarea></label></fieldset><button class="btn btn-primary">保存记录</button></form>`}</section>`:"";
   const archived = Boolean(item.archivedAt);
-  const notice = flags.invalid ? '<p class="notice error" role="alert">请检查名称、日期、费用和周期格式后重试。</p>'
+  const notice = flags.invalid ? `<p class="notice error" role="alert">${category==="device"?"请检查设备名称、日期、购买价格及字段格式。":"请检查订阅名称、日期、周期费用及账单周期。"}</p>`
     : flags.saved ? '<p class="notice" role="status">档案已保存。</p>' : "";
-  return render(hero(item.name ? escape(item.name) : "新增" + meta.title + "档案", link(base, "‹ " + meta.title, "muted") + (archived ? " · 已归档" : ""), ["device","subscription"].includes(category)&&id==="new"?moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual"):"") +
+  return render(hero(item.name ? escape(item.name) : "新增" + meta.title + "档案", (sharedForm?backLink(base,category==="device"?"返回电子设备":"返回会员订阅"):link(base, "‹ " + meta.title, "muted")) + (archived ? " · 已归档" : ""), ["device","subscription"].includes(category)&&id==="new"?moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual",flags.deviceReview||flags.subscriptionReview?"quick":"manual"):"") +
     notice + (flags.subscriptionReview?'<p class="notice" role="status">文字规则提取，请核对费用、周期及日期。未识别的续费和取消截止日期不会自动推算。</p>':"") + (flags.deviceReview?'<p class="notice" role="status">文字规则提取结果，请核对。未识别字段可留空；保修时长不会自动换算截止日期。</p>':"") + deviceSummary +
-    `<form class="panel editor" method="post"><fieldset>${input("name","名称",item.name,"text",'required maxlength="120"')}${inputs}${subscription}${deviceFields}
-    <label class="wide">备注<textarea name="notes" rows="4" maxlength="2000">${escape(item.notes)}</textarea></label></fieldset><div class="module-entry"><button class="button">${["device","subscription"].includes(category)?(id==="new"?(category==="device"?"确认保存设备":"确认保存订阅"):"保存修改"):"保存档案"}</button>${["device","subscription"].includes(category)?link(base,"取消","button secondary"):""}</div></form>` +
+    `<form class="panel editor${sharedForm?" component-form":""}" method="post"><fieldset>${input("name",category==="device"?"设备名称":category==="subscription"?"订阅名称":"名称",item.name,"text",'required maxlength="120"')}${inputs}${subscription}${deviceFields}
+    <label class="wide">备注<textarea name="notes" rows="4" maxlength="2000">${escape(item.notes)}</textarea></label></fieldset><div class="module-entry"><button class="${sharedForm?"btn btn-primary":"button"}">${["device","subscription"].includes(category)?(id==="new"?(category==="device"?"确认保存设备":"确认保存订阅"):"保存修改"):"保存档案"}</button>${sharedForm?entryButton(base,"取消","secondary"):""}</div></form>` +
     (id !== "new" && !archived ? '<details class="archive"><summary>归档档案</summary><form method="post"><p>归档后可在分类页查看。</p><button class="button secondary" name="operation" value="archive">确认归档</button></form></details>' : "") + (["device","subscription"].includes(category)&&archived?'<form class="archive" method="post"><button class="button secondary" name="operation" value="restore">恢复档案</button></form>':"") + (id!=="new"?deleteControl("档案",item.name):"") + deviceHistory, flags.invalid ? 400 : 200);
 }
 
@@ -232,12 +248,12 @@ async function record(request, db, category, id, url) {
   const details = existing && await db.prepare(`SELECT * FROM ${tables[category]} WHERE itemId=?`).bind(id).first();
   const deviceEvents=category==="device"&&existing?await foodAll(db,"SELECT kind,occurredAt,notes FROM LifecycleEvent WHERE itemId=? AND kind IN ('deviceRepair','deviceMaintenance') ORDER BY occurredAt DESC,id DESC",id):[];
   if (category==="device"&&id==="new"&&request.method==="GET"&&url.searchParams.get("mode")!=="manual") {
-    return render(hero("新增设备",link(base,"‹ 电子设备"),moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual"))+
-      (url.searchParams.get("mode")==="quick"?`<form class="panel editor" method="post" action="${base}/new"><input type="hidden" name="operation" value="deviceExtract"><input type="hidden" name="timeZone" data-intake-zone><label>描述设备<textarea name="text" rows="4" maxlength="2000" required placeholder="昨天买了一台笔记本，花了4999元，型号是A1，配置16GB，购买渠道是官方商城。"></textarea></label><div class="food-toolbar"><button class="button">提取信息</button>${link(base,"取消","button secondary")}</div></form>`:'<p class="notice">请选择快速录入或手动录入。</p>'));
+    return render(hero("新增设备",backLink(base,"返回电子设备"),moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual",url.searchParams.get("mode")==="quick"?"quick":""))+
+      (url.searchParams.get("mode")==="quick"?`<form class="panel editor component-form" method="post" action="${base}/new"><input type="hidden" name="operation" value="deviceExtract"><input type="hidden" name="timeZone" data-intake-zone><label>描述设备<textarea name="text" rows="4" maxlength="2000" required placeholder="昨天买了一台笔记本，花了4999元，型号是A1，配置16GB，购买渠道是官方商城。"></textarea></label><div class="food-toolbar"><button class="btn btn-primary">提取信息</button>${entryButton(base,"取消","secondary")}</div></form>`:'<p class="notice">请选择快速录入或手动录入。</p>'));
   }
   if(category==="subscription"&&id==="new"&&request.method==="GET"&&url.searchParams.get("mode")!=="manual") {
-    return render(hero("新增订阅",link(base,"‹ 会员订阅"),moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual"))+
-    (url.searchParams.get("mode")==="quick"?`<form class="panel editor" method="post" action="${base}/new"><input type="hidden" name="operation" value="subscriptionExtract"><input type="hidden" name="timeZone" data-intake-zone><label>描述订阅<textarea name="text" rows="4" maxlength="2000" required placeholder="今天开通了音乐会员，每月25元，自动续费，下次扣费日期2027年1月20日。"></textarea></label><div class="food-toolbar"><button class="button">提取信息</button>${link(base,"取消","button secondary")}</div></form>`:'<p class="notice">请选择快速录入或手动录入。</p>'));
+    return render(hero("新增订阅",backLink(base,"返回会员订阅"),moduleEntry(base+"/new?mode=quick",base+"/new?mode=manual",url.searchParams.get("mode")==="quick"?"quick":""))+
+    (url.searchParams.get("mode")==="quick"?`<form class="panel editor component-form" method="post" action="${base}/new"><input type="hidden" name="operation" value="subscriptionExtract"><input type="hidden" name="timeZone" data-intake-zone><label>描述订阅<textarea name="text" rows="4" maxlength="2000" required placeholder="今天开通了音乐会员，每月25元，自动续费，下次扣费日期2027年1月20日。"></textarea></label><div class="food-toolbar"><button class="btn btn-primary">提取信息</button>${entryButton(base,"取消","secondary")}</div></form>`:'<p class="notice">请选择快速录入或手动录入。</p>'));
   }
   if (request.method === "GET") {
     return editor(category, id, existing ?? {}, details ?? {}, {

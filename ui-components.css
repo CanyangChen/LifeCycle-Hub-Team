@@ -6,9 +6,9 @@
 .personal-ui .hero { background:var(--color-blue-soft); border:1px solid var(--color-border); padding:28px; border-radius:var(--radius-card); align-items:center; }
 .personal-ui h1 { font-size:clamp(26px,3vw,36px); line-height:1.3; letter-spacing:-.5px; }
 .personal-ui .button { min-height:var(--button-height); border-radius:var(--radius-button); padding:10px 18px; background:var(--color-action); color:#fff; font-size:14px; line-height:1.4; font-weight:650; }
-.personal-ui .button:hover { background:#385491; color:#fff; }
-.personal-ui .button.secondary { background:var(--color-surface-alt); color:var(--color-text-primary); }
-.personal-ui .button.secondary:hover { background:var(--color-blue-soft); }
+.personal-ui .button:hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-primary-bg-hover); color:var(--btn-primary-text); }
+.personal-ui .button.secondary { background:var(--btn-secondary-bg); color:var(--btn-secondary-text); }
+.personal-ui .button.secondary:hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-secondary-bg-hover); color:var(--btn-secondary-text); border-color:var(--btn-secondary-border-hover); }
 .personal-ui .panel { background:var(--color-surface); border-color:var(--color-border); border-radius:var(--radius-card); box-shadow:var(--shadow-card); }
 .personal-ui input,.personal-ui select,.personal-ui textarea { border-color:#abb3c9; border-radius:var(--radius-sm); }
 .personal-ui input:focus-visible,.personal-ui select:focus-visible,.personal-ui textarea:focus-visible,.personal-ui :focus-visible { outline:3px solid var(--color-primary); outline-offset:3px; }
@@ -23,7 +23,7 @@
 .drawer-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:24px; }
 .app-drawer nav { display:grid; grid-template-columns:1fr; gap:6px; }
 .app-drawer nav a { display:block; padding:13px 14px; border-radius:12px; color:var(--color-text-primary); font-size:15px; }
-.app-drawer nav a:hover,.app-drawer nav a[aria-current=page] { background:var(--color-blue-soft); color:var(--color-action); }
+.app-drawer nav a:hover { background:var(--state-hover-bg); color:var(--state-hover-text); }
 body:has(.app-drawer[open]) { overflow:hidden; }
 .skip-link { position:fixed; top:-80px; left:16px; z-index:100; background:#fff; padding:12px; }
 .skip-link:focus { top:12px; }

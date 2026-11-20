@@ -23,7 +23,8 @@ function drugStockSummary(batches) {
   return [...[...totals].map(([unit,total])=>Number(total.toFixed(6))+" "+unit),
     ...(unknown?[unknown+" 个批次数量待核对"]:[])].join(" · ")||"暂无在库数量";
 }
-const drugBack=(title,description="",button="")=>hero(title,link(drugRoot,"‹ 药品总览")+(description?" · "+escape(description):""),button);
+const drugBack=(title,description="",button="")=>hero(title,backLink(drugRoot,"返回药品库存")+(description?" · "+escape(description):""),button);
+const drugModuleForm=(content,button,action="")=>foodForm(content,button,action,"component-form");
 const drugError=(message,path=drugRoot,status=400)=>render(drugBack("请检查输入",message,foodButton(path,"返回")),status);
 const drugTypesOptions=(values,current)=>Object.entries(values).map(([key,label])=>foodOption(key,label,current)).join("");
 const drugDateInput=(name,label,value)=>foodInput(name,label,value,'type="date"');
@@ -172,7 +173,7 @@ function drugProfileFields(profile={},categories=[],parts=[],required=true) {
     foodInput("profileNotes","档案备注",profile.notes,'maxlength="1600"');
 }
 function drugBatchFields(row,locations,editing=false) {
-  return foodDropdown("locationId","储存位置",drugLocationOptions(locations,row.locationId),"required")+
+  return foodDropdown("locationId","存储位置",drugLocationOptions(locations,row.locationId),"required")+
     foodInput("storage","包装标注储存条件",row.storage,'maxlength="240"')+
     foodInput("purchasedOn","购买日期",row.purchasedAtLocal?.slice(0,10),'type="date"'+(editing?"":" data-purchase-date"))+
     foodInput("purchaseTime","购买时间",row.purchasedAtLocal?.slice(11),'type="time"'+(editing?"":" data-purchase-time"))+
@@ -240,19 +241,21 @@ async function drugNewPage(db,user,form,url) {
     const created=await drugCreate(db,user,form);
     if (!created) return drugError("检查药品档案、位置、数量单位及日期。",drugRoot+"/new");
     await db.batch(created.writes);
-    return foodRedirect(drugRoot+"/"+created.id+"?saved=1");
+    return foodRedirect(drugRoot+"/"+created.id+"?saved=1&added=1");
   }
   const [profiles,locations,categories]=await Promise.all([drugProfiles(db,user),drugLocations(db,user),drugCategories(db,user)]);
   const requested=url.searchParams.get("drug")||"";
-  const options=foodOption("","选择已有档案",requested)+profiles.map((r)=>foodOption(r.id,drugProfileTitle(r),requested)).join("")+
-    foodOption("new","＋ 新建药品档案",requested);
+  const selected=profiles.find(r=>r.id===requested);
+  if(requested&&!selected)return drugError("找不到要补充的药品，请返回重新选择。",drugRoot,404);
+  const choice=selected?.id||"new";
+  const options=foodOption("new","添加一种药品",choice)+profiles.map(r=>foodOption(r.id,drugProfileTitle(r),choice)).join("");
   const clock=intakeClock("Asia/Shanghai");
-  return render(drugBack("新增药品批次","每次购买新建独立批次。",moduleEntry(drugRoot+"/intake",drugRoot+"/new"))+
-    foodForm('<div class="wide food-subhead"><h2>药品档案</h2></div>'+
-      foodDropdown("drugId","选择药品",options,"required data-profile-picker")+
-      `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${drugProfileFields({},categories,[])}</fieldset>
-      <div class="wide food-subhead"><h2>本次库存批次</h2></div>`+
-      drugBatchFields({purchasedAtLocal:clock.day+"T"+clock.time,expiryLead:30},locations),"保存批次"));
+  return render(drugBack(selected?"补充药品库存":"添加药品",selected?"复用已核对的药品信息，本次购买独立保存；规格或剂型不同请添加另一种药品。":"填写药品信息和这次购买数量，一次保存完成。",moduleEntry(drugRoot+"/intake",drugRoot+"/new","manual"))+
+    drugModuleForm('<div class="wide food-subhead"><h2>药品信息</h2></div>'+
+      (profiles.length?foodDropdown("drugId","药品",options,"required data-profile-picker"):'<input type="hidden" name="drugId" value="new">')+
+      `<fieldset class="wide intake-fields" data-new-profile ${selected?"hidden disabled":""}>${drugProfileFields({},categories,[])}</fieldset>
+      <div class="wide food-subhead"><h2>这次购买的信息</h2></div>`+
+      drugBatchFields({purchasedAtLocal:clock.day+"T"+clock.time,expiryLead:30},locations),selected?"确认补充库存":"保存药品"));
 }
 async function drugProfilePage(db,user,form,url) {
   const profiles=await drugProfiles(db,user);
@@ -306,11 +309,11 @@ async function drugProfilePage(db,user,form,url) {
     ${foodDropdown("category","药品分类",foodOption("","全部分类",category)+foodOptions(categories,category))}<button class="button secondary">筛选</button></form>
     <div class="panel food-list">${profiles.filter((r)=>drugProfileTitle(r).toLowerCase().includes(q)&&(!category||r.categoryId===category||
       categories.find((c)=>c.id===r.categoryId)?.parentId===category)).map((r)=>link(drugRoot+"/profiles?id="+encodeURIComponent(r.id),escape(drugProfileTitle(r)))).join("")||'<p class="empty">暂无匹配档案。</p>'}</div>`+
-    foodForm(intakeHidden("id",current?.id||"")+drugProfileFields(current||{},categories,parts),current?"保存档案":"创建档案")+
+    drugModuleForm(intakeHidden("id",current?.id||"")+drugProfileFields(current||{},categories,parts),current?"保存档案":"创建档案")+
     (current?`<section><div class="section-heading"><h2>关联批次</h2>${foodButton(drugRoot+"/new?drug="+current.id,"新增批次")}</div>
       <p class="notice">当前库存合计：${escape(drugStockSummary(batches))}</p><div class="panel food-list">${batches.map((b)=>link(drugHref(b),escape(b.lot||b.purchasedAtLocal||"库存批次")+" · "+escape(drugQuantity(b)))).join("")||'<p class="empty">暂无库存批次。</p>'}</div></section>`:"")+
     (current?deleteControl("药品档案",drugProfileTitle(current),intakeHidden("id",current.id)):"")+
-    '<section><div class="section-heading"><h2>自定义子分类</h2></div>'+foodForm(intakeHidden("operation","subcategory")+
+    '<section><div class="section-heading"><h2>自定义子分类</h2></div>'+drugModuleForm(intakeHidden("operation","subcategory")+
       foodDropdown("parent","一级分类",foodOptions(categories.filter((r)=>!r.parentId),""))+
       foodInput("categoryName","子分类名称","",'required maxlength="80"'),"添加子分类")+"</section>");
 }
@@ -337,9 +340,9 @@ async function drugLocationPage(db,user,form) {
   }
   const fields=(r={})=>intakeHidden("id",r.id||"")+foodInput("name","位置名称",r.name,'required maxlength="80"')+
     foodInput("notes","位置说明",r.notes,'maxlength="500"');
-  return render(drugBack("药品储存位置","位置和包装标注的保存条件分别记录。")+foodForm(fields(),"新增位置")+
+  return render(drugBack("药品储存位置","位置和包装标注的保存条件分别记录。")+drugModuleForm(fields(),"新增位置")+
     locations.map((r)=>`<section><div class="section-heading"><h2>${escape(r.name)}</h2>
-      ${link(drugRoot+"?location="+encodeURIComponent(r.id)+"#inventory","查看批次")}</div>${foodForm(fields(r),"保存位置")}
+      ${link(drugRoot+"?location="+encodeURIComponent(r.id)+"#inventory","查看批次")}</div>${drugModuleForm(fields(r),"保存位置")}
       ${r.builtIn?"":`<form class="food-toolbar" method="post">${intakeHidden("id",r.id)}
       <button class="button secondary" name="operation" value="remove">删除自定义位置</button></form>`}</section>`).join(""));
 }
@@ -365,7 +368,7 @@ async function drugDashboard(db,user,url) {
   return render(hero("药品库存","管理包装有效期、批次和已核对的有效成分。",moduleEntry(drugRoot+"/intake",drugRoot+"/new"))+
     (q.has("deleted")?'<p class="notice" role="status">药品批次已删除。</p>':"")+
     `<div class="food-toolbar">${link(drugRoot+"/profiles","药品档案与分类","button secondary")}
-    ${link(drugRoot+"/locations","储存位置","button secondary")}${link(planRoot,"用药计划","button secondary")}${link(logRoot,"服用记录","button secondary")}
+    ${link(drugRoot+"/locations","存储位置","button secondary")}${link(planRoot,"用药计划","button secondary")}${link(logRoot,"服用记录","button secondary")}
     ${link(safetyRoot,"药品安全提示","button secondary")}</div>
     <section class="food-metrics">${metrics.map(([label,n])=>`<div class="panel"><small>${label}</small><strong>${n}</strong></div>`).join("")}</section>
     <section><div class="section-heading"><h2>待处理药品</h2></div><div class="panel food-list">${tasks.map((t)=>link(t.href||drugRoot+"/"+t.id,
@@ -376,9 +379,9 @@ async function drugDashboard(db,user,url) {
     ${foodDropdown("sort","排序",foodOption("expiry","按有效期",sort)+foodOption("purchase","按购买日期",sort))}
     ${foodDropdown("status","状态",foodOption("active","当前库存",history?"history":"active")+foodOption("history","历史批次",history?"history":"active"))}
     <button class="button secondary">筛选</button></form>
-    <div class="panel food-list">${records.map((r)=>link(drugHref(r),`<span><strong>${escape(drugTitle(r))}</strong>
+    ${filterSummary(records.length,drugRoot+"#inventory",q)}<div class="panel food-list">${records.map((r)=>link(drugHref(r),`<span><strong>${escape(drugTitle(r))}</strong>
     <small>${escape(r.locationName)} · ${escape(r.archivedAt?"已归档":drugStatuses[r.status])}${r.expiresOn?" · 包装有效期 "+escape(r.expiresOn):""}</small></span>
-    <strong>${escape(drugQuantity(r))}</strong>`)).join("")||'<p class="empty">暂无匹配批次。</p>'}</div></section>
+    <strong>${escape(drugQuantity(r))}</strong>`)).join("")||emptyInventory(rows.some(r=>drugLive(r)!==history)?'无匹配结果。':history?'暂无历史药品批次。':'暂无药品库存记录。',drugRoot,'添加药品',rows.some(r=>drugLive(r)!==history)?'请调整或清除筛选条件。':'可通过快速录入或手动录入添加药品库存。')}</div></section>
     <section><div class="section-heading"><h2>同成分库存</h2></div><div class="panel food-list">${overlaps.map((group)=>`<div><span><strong>${escape(group[0].originalName)}</strong>
       <small>${escape(group.map(drugTitle).join("、"))}</small></span></div>`).join("")||'<p class="empty">暂无已核对的重复成分。</p>'}</div>
       <p class="food-muted">库存中出现相同成分时，请核对包装或说明书。这里显示已录入的成分名称。</p></section>`);
@@ -393,25 +396,25 @@ async function drugDetail(db,user,row,url,editing=false) {
   if (editing) {
     const locations=await foodAll(db,"SELECT * FROM DrugStorageLocation WHERE userId=? AND (retired=0 OR id=?) ORDER BY builtIn DESC,rowid",user,row.locationId);
     return render(drugBack("编辑药品批次",drugTitle(row),link(drugHref(row),"取消","button secondary"))+
-      foodForm(intakeHidden("operation","edit")+intakeHidden("version",row.updatedAt)+drugBatchFields(row,locations,true),"保存批次"));
+      drugModuleForm(intakeHidden("operation","edit")+intakeHidden("version",row.updatedAt)+drugBatchFields(row,locations,true),"保存批次"));
   }
   const [parts,events]=await Promise.all([drugParts(db,user,row.drugId),
     foodAll(db,"SELECT kind,occurredAt,notes FROM LifecycleEvent WHERE itemId=? ORDER BY occurredAt DESC,rowid DESC LIMIT 40",row.itemId)]);
   const metric=(label,value)=>`<div><dt>${label}</dt><dd>${escape(value??"—")}</dd></div>`;
   return render(drugBack(escape(drugTitle(row)),row.archivedAt?"已归档":drugStatuses[row.status],
     foodButton(drugHref(row)+"/edit","编辑批次"))+
-    (url.searchParams.has("saved")?'<p class="notice" role="status">批次已保存。</p>':"")+
-    `<div class="food-toolbar">${link(drugRoot+"/profiles?id="+row.drugId,"查看药品档案")}
+    (url.searchParams.has("added")?`<p class="notice" role="status">已记录「${escape(drugTitle(row))}」这次购买，当前这份库存为 ${escape(drugQuantity(row))}。其他购买记录和历史服用记录保持不变。</p>`:url.searchParams.has("saved")?'<p class="notice" role="status">批次已保存。</p>':"")+
+    `<div class="food-toolbar">${link(drugRoot+"/profiles?id="+row.drugId,"查看药品信息")}${link(drugRoot+"/new?drug="+encodeURIComponent(row.drugId),"补充库存","button secondary")}
     ${link(planRoot+"?drug="+row.drugId,"建立用药计划","button secondary")}${link(logRoot+"?drug="+row.drugId+"&batch="+row.itemId,"记录实际服用","button secondary")}
     ${link(safetyRoot+"?drug="+row.drugId,"药品安全提示","button secondary")}</div><dl class="panel food-details">
     ${metric("当前库存",drugQuantity(row))}${metric("购买数量",row.purchasedAmount==null?null:row.purchasedAmount+" "+row.unit)}
     ${metric("包装规格",row.packageSpec||row.specification)}${metric("生产批号",row.lot)}${metric("生产日期",row.producedOn)}
     ${metric("包装有效期",row.expiresOn)}${metric("开封日期",row.openedOn)}${metric("开封后使用期限",row.openUseUntil)}
-    ${metric("储存位置",row.locationName)}${metric("包装标注储存条件",row.storage)}
+    ${metric("存储位置",row.locationName)}${metric("包装标注储存条件",row.storage)}
     ${metric("购买时间",row.purchasedAtLocal?.replace("T"," "))}${metric("记录创建时间",row.createdAt+" UTC")}${metric("备注",row.notes)}</dl>`+
     (drugLive(row)?`<div class="food-toolbar">${row.status==="sealed"?drugQuick("open","标记开封"):""}${drugQuick("using","开始使用")}
       ${drugQuick("stopped","停止使用")}${drugQuick("finished","标记用完")}${drugQuick("discarded","标记丢弃")}${drugQuick("expired","标记过期")}${drugQuick("archive","归档")}</div>
-      <section><div class="section-heading"><h2>库存操作</h2></div>${foodForm(
+      <section><div class="section-heading"><h2>库存操作</h2></div>${drugModuleForm(
         drugNumber("amount","数量","")+foodDropdown("operation","操作",foodOption("adjust","设置剩余量","adjust")+foodOption("consume","记录部分消耗","adjust"))+
         `<p class="wide food-muted">库存单位：${escape(row.unit||"尚未填写")}。</p>`,"保存库存操作")}</section>`:"")+
     deleteControl("药品批次",drugTitle(row)+(row.lot?" · "+row.lot:""))+

@@ -1,0 +1,26 @@
+/* Opt-in button variants. Existing .button consumers are unchanged. */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--btn-icon-gap);
+  box-sizing:border-box; height:var(--btn-height-standard); min-width:var(--btn-width-entry); padding:0 20px;
+  border-radius:var(--btn-radius); border:1.5px solid transparent;
+  font-size:var(--btn-font-size); font-weight:var(--btn-font-weight); line-height:1;
+  cursor:pointer; user-select:none; text-decoration:none;
+  transition:background-color var(--btn-transition),border-color var(--btn-transition),color var(--btn-transition),box-shadow var(--btn-transition);
+}
+.btn .line-icon { width:var(--btn-icon-size); height:var(--btn-icon-size); }
+.btn-primary { background:var(--btn-primary-bg); border-color:var(--btn-primary-border); color:var(--btn-primary-text); }
+.btn-primary:hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-primary-bg-hover); color:var(--btn-primary-text); }
+.btn-primary:active:not(:disabled):not([aria-disabled=true]) { background:var(--btn-primary-bg-active); }
+.btn-secondary { background:var(--btn-secondary-bg); border-color:var(--btn-secondary-border); color:var(--btn-secondary-text); }
+.btn-secondary:hover:not(:disabled):not([aria-disabled=true]) { background:var(--btn-secondary-bg-hover); border-color:var(--btn-secondary-border-hover); color:var(--btn-secondary-text); }
+.btn-secondary:active:not(:disabled):not([aria-disabled=true]) { background:var(--btn-secondary-bg-active); border-color:var(--btn-secondary-border-hover); }
+.btn:focus-visible { outline:2px solid var(--state-focus-color); outline-offset:3px; box-shadow:var(--state-focus-ring); }
+.btn:disabled,.btn[aria-disabled=true] { background:var(--btn-disabled-bg); border-color:var(--btn-disabled-border); color:var(--btn-disabled-text); cursor:not-allowed; box-shadow:none; }
+.btn-primary:disabled,.btn-primary[aria-disabled=true] { background:var(--btn-primary-disabled-bg); }
+.entry-actions { display:flex; align-items:center; gap:var(--btn-group-gap); }
+.entry-actions .btn { width:var(--btn-width-entry); min-width:var(--btn-width-entry); flex:0 0 var(--btn-width-entry); }
+@media(max-width:600px) {
+  .personal-ui .hero > .entry-actions { flex-wrap:wrap; }
+  .entry-actions .btn { min-width:0; width:min(var(--btn-width-entry),100%); max-width:100%; flex:0 1 var(--btn-width-entry); padding-inline:10px; }
+}
+@media(prefers-reduced-motion:reduce) { .btn { transition:none; } }

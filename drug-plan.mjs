@@ -11,7 +11,7 @@ const planFormField=(form,prefix,name)=>foodValue(form,prefix+name);
 function drugPlanFields(plan={},prefix="") {
   const key=(name)=>prefix+name;
   const options=(choices,value)=>drugTypesOptions(choices,value);
-  return drugNumber(key("dose"),"单次剂量",plan.dose)+foodInput(key("unit"),"剂量单位",plan.unit,'maxlength="20"')+
+  return drugNumber(key("dose"),"单次用药剂量",plan.dose)+foodInput(key("unit"),"剂量单位",plan.unit,'maxlength="20"')+
     foodInput(key("frequency"),"每日次数",plan.frequency,'type="number" min="1" max="24"')+
     foodInput(key("times"),"提醒时间",plan.times||"", 'placeholder="例如 08:00,13:00,19:00" maxlength="180"')+
     foodInput(key("mealTiming"),"与进餐的关系",plan.mealTiming,'placeholder="按原说明填写，例如饭后" maxlength="80"')+
@@ -115,7 +115,7 @@ async function drugPlanPage(db,user,form,url) {
     foodDropdown("drugId","关联药品",foodOption("","选择药品",selected)+profiles.map((p)=>foodOption(p.id,drugProfileTitle(p),selected)).join(""),"required");
   const batchOptions=batches.filter((b)=>!b.archivedAt&&(!current||b.drugId===current.drugId))
     .map((b)=>foodOption(b.itemId,[drugTitle(b),b.lot,b.locationName].filter(Boolean).join(" · "),current?.batchId)).join("");
-  const input=foodForm(core+foodDropdown("batchId","指定批次（可选）",foodOption("","确认服用时选择","")+batchOptions)+
+  const input=drugModuleForm(core+foodDropdown("batchId","指定批次（可选）",foodOption("","确认服用时选择","")+batchOptions)+
     drugPlanFields(current?{...current,times:planTimes(current).join(", ")}:{startOn:todayFood()}),current?"保存用药计划":"新建用药计划");
   const stateButtons=(p)=>`<form class="food-toolbar" method="post">${intakeHidden("id",p.id)}
     ${p.status==="active"?'<button class="button secondary" name="operation" value="paused">暂停</button>':""}
@@ -274,7 +274,7 @@ async function drugLogPage(db,user,form,url) {
   return render(drugBack("实际服用记录","记录实际发生的服用情况。",foodButton(planRoot,"用药计划"))+
     `<div class="food-toolbar">${link(safetyRoot+(current?.occurredAtLocal?"?date="+current.occurredAtLocal.slice(0,10):""),"查看安全提示","button secondary")}</div>`+
     (url.searchParams.has("saved")?'<p class="notice" role="status">记录已保存。</p>':"")+savedStock+
-    `<section><div class="section-heading"><h2>${current?"校正记录":"新增或确认服用记录"}</h2>${current?link(logRoot,"新建记录"):""}</div>${foodForm(formContent,"保存服用记录")}</section>
+    `<section><div class="section-heading"><h2>${current?"校正记录":"新增或确认服用记录"}</h2>${current?link(logRoot,"新建记录"):""}</div>${drugModuleForm(formContent,"保存服用记录")}</section>
     <section><div class="section-heading"><h2>服用历史</h2></div><form class="filters">${drugDateInput("date","按日期查看",day)}
     <button class="button secondary">筛选</button></form><div class="panel food-list">${rows.map((r)=>link(logRoot+"?id="+r.id,
       `<span><strong>${escape(drugTitle(r))}</strong><small>${escape((r.occurredAtLocal||r.scheduledAtLocal||r.createdAt.slice(0,16)).replace("T"," "))} · ${logStatuses[r.status]}</small></span>

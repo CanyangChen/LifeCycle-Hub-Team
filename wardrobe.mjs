@@ -72,29 +72,29 @@ function wardrobeData(row) {
 function wardrobeTagEditor(key, value) {
   const selected = wardrobeSplit(value);
   const choices = [...new Set([...wardrobeTags[key],...selected])];
-  return '<fieldset class="wardrobe-tags"><legend>'+escape(wardrobeFields[key])+'</legend>'+
+  return '<fieldset class="wardrobe-tags"><legend>'+escape(wardrobeFields[key].replace('（逗号分隔）',''))+'</legend>'+
     choices.map(tag => '<label><input type="checkbox" name="'+key+'" value="'+escape(tag)+'" '+(selected.includes(tag)?"checked":"")+'>'+escape(tag)+'</label>').join("")+
     '<label>补充标签（逗号分隔）<input name="'+key+'Custom" maxlength="240"></label></fieldset>';
 }
 async function wardrobeRoute(request,db,url) {
   const root="/items/clothing";
   const part=url.pathname.slice(root.length).split("/").filter(Boolean);
-  if(part.length>1)return render(hero("找不到档案",link(root,"返回衣橱")),404);
+  if(part.length>1)return render(hero("找不到档案",backLink(root,"返回衣橱")),404);
   const id=part[0];
   const all=(await db.prepare("SELECT i.*,c.* FROM Item i JOIN ClothingDetail c ON c.itemId=i.id WHERE i.category='clothing' AND i.deletedAt IS NULL").all()).results;
   const row=all.find(r=>r.id===id);
   const input=(name,label,value="",type="text")=>'<label>'+label+'<input name="'+name+'" type="'+type+'" maxlength="240" value="'+escape(value)+'"></label>';
   function page(item={},data={},message="",review=false) {
-    return render(hero(item.name?escape(item.name):"新增衣物",link(root,"返回衣橱"),!item.id?moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual"):"")+
+    return render(hero(item.name?escape(item.name):"新增衣物",backLink(root,"返回衣橱"),!item.id?moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual",review?"quick":"manual"):"")+
       (message?'<p role="alert">'+escape(message)+'</p>':"")+
       (item.id?'<p>'+escape(wardrobeAge(data.purchase))+'</p>':"")+
-      '<form method="post" action="/items/clothing/'+(item.id||"new")+'" class="panel editor wardrobe-editor"><fieldset>'+input("name","名称",item.name)+wardrobeTimeEditor(data.purchase,review || Boolean(data.purchase?.precision && data.purchase.precision!=="day"))+
+      '<form method="post" action="/items/clothing/'+(item.id||"new")+'" class="panel editor wardrobe-editor component-form"><fieldset>'+input("name","衣物名称",item.name)+wardrobeTimeEditor(data.purchase,review || Boolean(data.purchase?.precision && data.purchase.precision!=="day"))+
       Object.entries(wardrobeFields).map(([key,label])=>wardrobeTags[key] ? wardrobeTagEditor(key,data[key]) : wardrobeChoices[key] ? wardrobeSelect(key,label,data[key]) : input(key,label,data[key])).join("")+
       input("minTemp","最低适用温度 °C",data.minTemp,"number")+input("maxTemp","最高适用温度 °C",data.maxTemp,"number")+
-      '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><div class="food-toolbar"><button class="button">保存档案</button>'+link(root,"取消","button secondary")+'</div></form>'+
+      '<label>备注<textarea name="notes" maxlength="2000">'+escape(item.notes)+'</textarea></label></fieldset><div class="food-toolbar"><button class="btn btn-primary">保存衣物</button>'+entryButton(root,"取消","secondary")+'</div></form>'+
       (item.id?'<form method="post"><button class="button secondary" name="operation" value="'+(item.archivedAt?'restore':'archive')+'">'+(item.archivedAt?'恢复归档':'归档')+'</button></form>'+deleteControl("档案",item.name):""),message&&!review?400:200);
   }
-  if(id&&id!=="new"&&id!=="intake"&&!row)return render(hero("找不到档案",link(root,"返回衣橱")),404);
+  if(id&&id!=="new"&&id!=="intake"&&!row)return render(hero("找不到档案",backLink(root,"返回衣橱")),404);
   if(request.method==="POST"){
     if(request.headers.get("origin")!==url.origin)return new Response("请求来源无效",{status:403});
     if(!id)return new Response(null,{status:405});
@@ -137,13 +137,13 @@ async function wardrobeRoute(request,db,url) {
     }catch(error){return page(item,{...data,purchase:{raw:purchaseInput}},error.message);}
   }
   if(id==="new"&&request.method==="GET"&&!["quick","manual"].includes(url.searchParams.get("mode"))) {
-    return render(hero("添加衣物",link(root,"返回衣橱"))+
-      '<div class="intake-grid wardrobe-entry">'+link(root+'/new?mode=quick','<h2>快速录入</h2><p>说说这件衣物，识别后核对保存。</p>',"panel wardrobe-card")+
+    return render(hero("添加衣物",backLink(root,"返回衣橱"))+
+      '<div class="intake-grid wardrobe-entry">'+link(root+'/new?mode=quick','<h2>快速录入</h2><p>输入衣物信息，提取后核对保存。</p>',"panel wardrobe-card")+
       link(root+'/new?mode=manual','<h2>手动录入</h2><p>选择标签和购买日期。</p>',"panel wardrobe-card")+'</div>');
   }
   if(id==="new"&&url.searchParams.get("mode")==="quick") {
-    return render(hero("快速录入",link(root,"返回衣橱"),moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual"))+
-      '<form class="panel wardrobe-editor" action="'+root+'/intake" method="post"><label>描述衣物<textarea name="text" rows="4" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><div class="food-toolbar"><button class="button">提取信息</button>'+link(root,"取消","button secondary")+'</div></form>');
+    return render(hero("快速录入",backLink(root,"返回衣橱"),moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual","quick"))+
+      '<form class="panel wardrobe-editor component-form" action="'+root+'/intake" method="post"><label>描述衣物<textarea name="text" rows="4" maxlength="2000" required placeholder="两年前买了一件羊毛外套，花了399元，经常穿，需要干洗。"></textarea></label><div class="food-toolbar"><button class="btn btn-primary">提取信息</button>'+entryButton(root,"取消","secondary")+'</div></form>');
   }
   if(id)return page(row||{},row?wardrobeData(row):{});
   const q=url.searchParams.get("q")||"",archived=url.searchParams.get("status")==="archived";
@@ -158,5 +158,5 @@ async function wardrobeRoute(request,db,url) {
   return render(hero("我的衣橱","衣物、购买时长与洗护标签",moduleEntry(root+"/new?mode=quick",root+"/new?mode=manual"))+
     '<form class="panel editor wardrobe-filters" data-wardrobe-filters><fieldset>'+input("q","名称搜索",q)+'<details class="wide wardrobe-more"'+(["kind","material","frequency","weather","care","temperature"].some(k=>url.searchParams.get(k))?' open':'')+'><summary>更多筛选</summary><div class="wardrobe-filter-grid">'+["kind","material","frequency","weather","care"].map(k=>input(k,wardrobeFields[k],url.searchParams.get(k))).join("")+input("temperature","适用温度 °C",url.searchParams.get("temperature"),"number")+'</div></details>'+
     '<label>状态<select name="status"><option value="active">在用</option><option value="archived" '+(archived?"selected":"")+'>已归档</option></select></label><label>排序<select name="sort"><option value="updated">最近更新</option><option value="purchase" '+(url.searchParams.get("sort")==="purchase"?"selected":"")+'>购买时间</option></select></label></fieldset><button class="button">筛选</button></form>'+
-    '<div class="intake-grid wardrobe-grid">'+rows.map(r=>{const d=wardrobeData(r);return link(root+"/"+r.id,'<div class="wardrobe-placeholder" aria-label="衣物占位图">◇</div><h2>'+escape(r.name)+'</h2><p>'+escape(wardrobeAge(d.purchase))+'</p><p>'+escape([d.kind,d.material,d.frequency,d.care].filter(Boolean).join(" · "))+'</p><p>温度 '+escape(d.minTemp??"未标记")+" ～ "+escape(d.maxTemp??"未标记")+' °C · '+escape(d.weather||"天气未标记")+'</p><span class="wardrobe-card-action">查看与编辑 →</span>',"panel wardrobe-card");}).join("")+(rows.length ? "" : '<p class="empty">暂无匹配衣物。</p>')+'</div>');
+    filterSummary(rows.length,root,url.searchParams)+'<div class="intake-grid wardrobe-grid">'+rows.map(r=>{const d=wardrobeData(r);return link(root+"/"+r.id,'<div class="wardrobe-placeholder" aria-label="衣物占位图">◇</div><h2>'+escape(r.name)+'</h2><p>'+escape(wardrobeAge(d.purchase))+'</p><p>'+escape([d.kind,d.material,d.frequency,d.care].filter(Boolean).join(" · "))+'</p><p>温度 '+escape(d.minTemp??"未标记")+" ～ "+escape(d.maxTemp??"未标记")+' °C · '+escape(d.weather||"天气未标记")+'</p><span class="wardrobe-card-action">查看与编辑 →</span>',"panel wardrobe-card");}).join("")+(rows.length ? "" : emptyInventory(all.some(r=>Boolean(r.archivedAt)===archived)?'无匹配结果。':archived?'暂无已归档衣物记录。':'暂无衣物记录。',root,'添加衣物',all.some(r=>Boolean(r.archivedAt)===archived)?'请调整或清除筛选条件后重试。':'可添加衣物；品牌、材质及洗护信息可稍后补充。'))+'</div>');
 }

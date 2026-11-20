@@ -28,14 +28,15 @@ const foodDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !value.startsWi
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10) === value;
 const foodAddDays = (day, offset) => new Date(Date.parse(day) + offset * 86400000).toISOString().slice(0,10);
 const foodOption = (value, label, current) => `<option value="${escape(value)}"${value === current ? " selected" : ""}>${escape(label)}</option>`;
-const foodOptions = (rows, selected) => rows.map((r) => foodOption(r.id, r.name, selected)).join("");
+const foodOptions = (rows, selected) => rows.map((r) => foodOption(r.id, r.id==="unassigned"?"待指定存储位置":r.name, selected)).join("");
 const foodDropdown = (name, label, options, attrs = "") => `<label>${label}<select name="${name}" ${attrs}>${options}</select></label>`;
 const foodInput = (name, label, value, attrs = "") =>
   `<label>${label}<input name="${name}" value="${escape(value)}" ${attrs}></label>`;
-const foodForm = (content, button, action = "") => `<form class="panel editor food-form" method="post" ${action ? `action="${action}"` : ""}>
-  <fieldset>${content}</fieldset><button class="button">${button}</button></form>`;
+const foodForm = (content, button, action = "", component = "") => `<form class="panel editor food-form${component?" "+component:""}" method="post" ${action ? `action="${action}"` : ""}>
+  <fieldset>${content}</fieldset><button class="${component?"btn btn-primary":"button"}">${button}</button></form>`;
+const foodModuleForm = (content,button,action="") => foodForm(content,button,action,"component-form");
 const foodButton = (url, label) => link(url, label, "button");
-const foodBack = (title, description = "", action = "") => hero(title, link(foodRoot, "‹ 食品库存") + (description ? " · " + description : ""), action);
+const foodBack = (title, description = "", action = "") => hero(title, backLink(foodRoot,"返回食品库存") + (description ? " · " + description : ""), action);
 const foodRedirect = (location) => new Response(null, {status:303,headers:{location}});
 const foodError = (message, back = foodRoot, status = 400) =>
   render(foodBack("请检查输入", escape(message), foodButton(back, "返回")), status);
@@ -80,7 +81,7 @@ async function ensureFoodData(db) {
 
 const foodRowsSql = `SELECT f.*, i.id,i.name AS oldName,i.notes,i.archivedAt,i.createdAt,
   i.updatedAt,p.name,p.brand,p.categoryId,p.specification,p.storageAdvice,p.imageUrl,
-  c.name AS categoryName,c.parentId,sl.name AS locationName,
+  c.name AS categoryName,c.parentId,CASE WHEN sl.id='unassigned' THEN '待指定存储位置' ELSE sl.name END AS locationName,
   nullif(max(coalesce(f.portionCheckAnchor,''),coalesce((SELECT MAX(checkedOn) FROM FoodInspection WHERE itemId=i.id),'')),'') AS checkedOn
   FROM FoodDetail f JOIN Item i ON i.id=f.itemId
   LEFT JOIN FoodItem p ON p.id=f.foodId LEFT JOIN FoodCategory c ON c.id=p.categoryId
@@ -148,7 +149,7 @@ function foodCalendar(rows, requested, today) {
       link(foodHref(row),escape(foodTitle(row))+" · "+label)).join("<br>")}</span></div>`).join("");
   return `<section id="calendar"><div class="section-heading"><h2>到期日历</h2><div class="food-toolbar">
     ${link("?month="+change(-1)+"#calendar","上月")} <strong>${month}</strong>${link("?month="+change(1)+"#calendar","下月")}</div></div>
-    <div class="panel calendar-grid">${["一","二","三","四","五","六","日"].map((label)=>'<small>'+label+'</small>').join("")}
+    <div class="panel calendar-grid"><div class="calendar-weekdays" aria-label="星期">${["一","二","三","四","五","六","日"].map((label)=>'<small>'+label+'</small>').join("")}</div>
     ${"<span></span>".repeat((first.getUTCDay()+6)%7)}${cells}</div>
     <div class="panel food-list">${agenda||'<p class="empty">本月暂无到期或检查事件。</p>'}</div></section>`;
 }
@@ -175,19 +176,19 @@ async function foodHome(db, url) {
     : (a.expiresOn || "9999").localeCompare(b.expiresOn || "9999"));
   const taskBlock = (list) => `<div class="panel reminder-list">${list.map(({r,day,text}) =>
     link(foodHref(r), `<span class="marker"></span><span><strong>${escape(foodTitle(r))}</strong><small>${escape(text)} · ${escape(r.locationName)}</small></span><time>${escape(day)}</time>`)
-  ).join("") || '<p class="empty">暂无事项。</p>'}</div>`;
+  ).join("") || '<p class="empty">暂无待处理事项。</p>'}</div>`;
   const due = tasks.filter((t) => t.kind === "expiry");
   const checks = tasks.filter((t) => t.kind === "check");
   const metrics = [["在库批次",active.length],["临期批次",due.filter((t) => t.days >= 0).length],
     ["待检查批次",checks.length],["已开封批次",active.filter((r) => r.openedOn || r.packaging === "opened").length]];
   const badge = (r) => foodActive(r) && r.expiresOn && r.expiresOn < today
     ? "已超过"+foodExpiryLabel(r) : foodActive(r) ? foodPackages[r.packaging] : (r.archivedAt ? "已归档" : foodDispositions[r.disposition]);
-  return render(hero("食品库存", "查看每批食品的位置、库存与待处理事项。", moduleEntry(foodRoot+"/intake",foodRoot+"/new"))
-    + `<div class="food-toolbar">${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理储存位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
+  return render(hero("食品库存", "查看食品库存、批次及存储信息。", moduleEntry(foodRoot+"/intake",foodRoot+"/new"))
+    + `<div class="food-toolbar">${link(foodRoot+"/profiles","食品档案与分类","button secondary")}${link(foodRoot+"/locations","管理存储位置","button secondary")}${link(foodStatsPath,"消耗统计","button secondary")}</div>
     <section class="food-metrics">${metrics.map(([label,count]) => `<div class="panel"><small>${label}</small><strong>${count}</strong></div>`).join("")}</section>
     <section><div class="section-heading"><h2>优先处理</h2></div>${taskBlock(tasks.filter((t) => t.kind === "expiry" || t.day <= today).slice(0,8))}</section>
-    <section><div class="section-heading"><h2>储存位置</h2></div><div class="category-grid">${locations.map((r) =>
-      link(foodRoot+"?location="+encodeURIComponent(r.id)+"#inventory", `<strong>${escape(r.name)}</strong><small>${active.filter((a) => a.locationId===r.id).length} 个批次</small>`,"panel category")).join("")}</div></section>
+    <section><div class="section-heading"><h2>存储位置</h2></div><div class="category-grid">${locations.map((r) =>
+      link(foodRoot+"?location="+encodeURIComponent(r.id)+"#inventory", `<strong>${escape(r.id==="unassigned"?"待指定存储位置":r.name)}</strong><small>${active.filter((a) => a.locationId===r.id).length} 个批次${location===r.id?" · 已选择":""}</small>`,"panel category",location===r.id?'aria-current="true"':"")).join("")}</div></section>
     ${q.has("deleted")?'<p class="notice" role="status">食品批次已删除。</p>':""}
     <section id="inventory"><div class="section-heading"><h2>库存批次</h2></div>
     ${q.has("imported") ? '<p class="notice" role="status">已保存确认的食品批次。</p>' : ""}
@@ -199,7 +200,7 @@ async function foodHome(db, url) {
       ${foodDropdown("sort","排序",foodOption("expiry","到期日期",sort)+foodOption("purchase","购买日期",sort))}
       ${foodDropdown("status","记录",foodOption("active","当前库存",status)+foodOption("history","历史批次",status))}
       <button class="button secondary">筛选</button></form>
-      <div class="panel food-list">${inventory.map((r) => link(foodHref(r), `<span><strong>${escape(foodTitle(r))}</strong><small>${escape(r.locationName)} · ${escape(badge(r))}${r.purchasedOn ? " · 购买 "+escape(r.purchasedOn) : ""}${r.expiresOn ? " · 到期 "+escape(r.expiresOn) : ""}</small></span><strong>${escape(foodAmount(r))}</strong>`)).join("") || '<p class="empty">暂无匹配批次。</p>'}</div></section>
+      ${filterSummary(inventory.length,foodRoot+"#inventory",q)}<div class="panel food-list">${inventory.map((r) => link(foodHref(r), `<span><strong>${escape(foodTitle(r))}</strong><small>${escape(r.locationName)} · ${escape(badge(r))}${r.purchasedOn ? " · 购买 "+escape(r.purchasedOn) : ""}${r.expiresOn ? " · 到期 "+escape(r.expiresOn) : ""}</small></span><strong>${escape(foodAmount(r))}</strong>`)).join("") || emptyInventory(rows.some(r=>status==="history"?!foodActive(r):foodActive(r))?'无匹配结果。':status==="history"?'暂无历史库存记录。':'暂无库存记录。',foodRoot,'添加食品',rows.some(r=>status==="history"?!foodActive(r):foodActive(r))?'请调整或清除筛选条件后重试。':'可添加食品并记录数量、日期和存储位置。')}</div></section>
     <section><div class="section-heading"><h2>周期检查</h2></div>${taskBlock(checks)}</section>
     ${foodCalendar(active,q.get("month"),today)}
     <p class="food-muted">到期日期以确认记录为准。储存检查日期用于库存管理。</p>`);
@@ -280,19 +281,20 @@ async function foodReferenceData(db) {
   ]);
 }
 
-function foodProfileFields(profile, categories, required = true) {
-  return foodInput("name","食品名称",profile?.name,'maxlength="120"'+ (required ? " required" : "")) +
-    foodInput("brand","品牌",profile?.brand,'maxlength="120"') +
-    foodDropdown("categoryId","食品分类",foodCategoryOptions(categories,profile?.categoryId ?? "")) +
-    foodInput("specification","默认规格",profile?.specification,'maxlength="240" placeholder="例如：1 箱 × 12 瓶"') +
-    foodInput("storageAdvice","默认储存说明",profile?.storageAdvice,'maxlength="240" placeholder="可记录包装说明及出处"') +
-    foodInput("imageUrl","图片链接",profile?.imageUrl,'type="url" maxlength="500"') +
-    foodInput("profileNotes","档案备注",profile?.notes,'maxlength="500"');
+function foodProfileFields(profile, categories, required = true, compact = false) {
+  const name=foodInput("name","食品名称",profile?.name,'maxlength="120"'+ (required ? " required" : ""));
+  const brand=foodInput("brand","品牌",profile?.brand,'maxlength="120"');
+  const basics=foodDropdown("categoryId","食品分类",foodCategoryOptions(categories,profile?.categoryId ?? ""))+
+    foodInput("specification","默认规格",profile?.specification,'maxlength="240" placeholder="例如：1 箱 × 12 瓶"');
+  const extra=foodInput("storageAdvice","默认储存说明",profile?.storageAdvice,'maxlength="240" placeholder="可记录包装说明及出处"')+
+    foodInput("imageUrl","图片链接",profile?.imageUrl,'type="url" maxlength="500"')+
+    foodInput("profileNotes",compact?"食品备注":"档案备注",profile?.notes,'maxlength="500"');
+  return compact?name+basics+'<details class="wide intake-more"><summary>更多食品信息（选填，可稍后补充）</summary><div>'+brand+extra+'</div></details>':name+brand+basics+extra;
 }
 
 function foodBatchFields(row, locations, editing = false) {
   const presets = ["1 瓶","1 箱 × 6 瓶","1 箱 × 12 瓶","1 箱 × 24 瓶","1 盒","1 袋"];
-  return foodDropdown("locationId","储存位置",foodOptions(locations,row?.locationId || "unassigned"),"required") +
+  return foodDropdown("locationId","存储位置",foodOptions(locations,row?.locationId || "unassigned"),"required") +
     foodInput("storage","储存方式与条件",row?.storage,'maxlength="240" placeholder="例如：密封、避光，核对包装说明"') +
     foodInput("batch","批次编号",row?.batch,'maxlength="240"') +
     foodDropdown("openedState","是否开封",
@@ -383,22 +385,26 @@ async function foodCreate(db, form, now = new Date().toISOString(), stageOnly = 
   return id;
 }
 
-async function foodNew(db, form) {
+async function foodNew(db, form, url) {
   if (form) {
     const id = await foodCreate(db,form);
-    return id ? foodRedirect(foodRoot+"/"+id+"?saved=1") :
+    return id ? foodRedirect(foodRoot+"/"+id+"?saved=1&added=1") :
       foodError("请检查食品档案、位置、日期和数量。填写数字数量时也需要填写单位。",foodRoot+"/new");
   }
   const [profiles,locations,categories] = await foodReferenceData(db);
-  const choices = '<option value="" selected disabled>选择已有食品档案</option>'+foodOptions(profiles,"")+foodOption("new","＋ 新建食品档案","");
-  return render(foodBack("添加库存批次","每次购买单独记录。",moduleEntry(foodRoot+"/intake",foodRoot+"/new")) +
-    foodForm('<div class="wide food-subhead"><h2>食品档案</h2><p>这是什么食品？通常只需建一次。</p></div>' +
-      foodDropdown("foodId","选择食品",choices,"required data-profile-picker") +
-      `<fieldset class="wide intake-fields" data-new-profile hidden disabled>${foodProfileFields(null,categories,true)}</fieldset>
+  const requested=url?.searchParams.get("foodId")||"";
+  const selected=profiles.find(p=>p.id===requested);
+  if(requested&&!selected)return foodError("找不到要补充的食品，请返回重新选择。",foodRoot,404);
+  const choice=selected?.id||"new";
+  const choices=foodOption("new","添加一种食品",choice)+foodOptions(profiles,choice);
+  return render(foodBack(selected?"补充库存":"添加食品",selected?"本次购买单独保存，原有库存不会覆盖。":"填写食品信息、购买数量与存储位置。",moduleEntry(foodRoot+"/intake",foodRoot+"/new","manual")) +
+    foodModuleForm('<div class="wide food-subhead"><h2>食品名称</h2></div>' +
+      (profiles.length?foodDropdown("foodId","食品",choices,"required data-profile-picker"):'<input type="hidden" name="foodId" value="new">') +
+      `<fieldset class="wide intake-fields" data-new-profile ${selected?"hidden disabled":""}>${foodProfileFields(null,categories,true,true)}</fieldset>
       <input type="hidden" name="defaultPurchasedOn" data-default-purchase-date value="${todayFood()}">
       <input type="hidden" name="defaultPurchaseTime" data-default-purchase-time value="${localTimeFood()}">
-      <div class="wide food-subhead"><h2>本次库存批次</h2><p>这次购买的数量、日期和存放位置。</p></div>` +
-      foodBatchFields({purchasedOn:todayFood(),purchasedAtLocal:todayFood()+"T"+localTimeFood(),expiryLead:3},locations),"保存批次"));
+      <div class="wide food-subhead"><h2>本次购买信息</h2><p>记录数量、日期和存放位置。</p></div>` +
+      foodBatchFields({purchasedOn:todayFood(),purchasedAtLocal:todayFood()+"T"+localTimeFood(),expiryLead:3},locations),selected?"确认补充库存":"保存食品","","component-form"));
 }
 
 async function foodManageLocations(db, form) {
@@ -428,10 +434,10 @@ async function foodManageLocations(db, form) {
     foodDropdown("kind","储存类型",["","常温","冷藏","冷冻"].map((k)=>foodOption(k,k||"未指定",r.kind||"")).join("")) +
     foodInput("temperature","温度范围",r.temperature,'maxlength="80"') +
     foodInput("notes","说明",r.notes,'maxlength="500"');
-  return render(foodBack("储存位置","位置表示实际存放地点。") +
-    `<section><div class="section-heading"><h2>新增位置</h2></div>${foodForm(fields(),"新增位置")}</section>` +
+  return render(foodBack("存储位置","位置表示实际存放地点。") +
+    `<section><div class="section-heading"><h2>新增位置</h2></div>${foodModuleForm(fields(),"新增位置")}</section>` +
     locations.map((r) => `<section><div class="section-heading"><h2>${escape(r.name)}</h2>
-      ${link(foodRoot+"?location="+encodeURIComponent(r.id)+"#inventory","查看库存")}</div>${foodForm(fields(r),"保存位置")}
+      ${link(foodRoot+"?location="+encodeURIComponent(r.id)+"#inventory","查看库存")}</div>${foodModuleForm(fields(r),"保存位置")}
       ${r.builtIn ? "" : `<form method="post" class="food-inline"><input type="hidden" name="id" value="${escape(r.id)}">
       <button class="button secondary" name="operation" value="remove">删除自定义位置</button></form>`}</section>`).join(""));
 }
@@ -471,18 +477,18 @@ async function foodManageProfiles(db, form, url) {
     foodDropdown("parentId","一级分类",foodOptions(roots,"")) + foodInput("childName","子分类名称","",'required maxlength="80"');
   return render(foodBack("食品档案与分类","一个食品档案可以关联多个购买批次。") +
     (url.searchParams.has("deleted")?'<p class="notice" role="status">食品档案已删除。</p>':"")+
-    `<section><div class="section-heading"><h2>食品基础档案</h2>${current ? link(foodRoot+"/profiles","新建档案") : ""}</div>
+    `<section><div class="section-heading"><h2>食品信息</h2>${current ? link(foodRoot+"/profiles","添加食品信息") : ""}</div>
     <div class="panel food-list">${profiles.map((r)=>link(foodRoot+"/profiles?id="+encodeURIComponent(r.id),escape(r.name)+(r.brand ? " · "+escape(r.brand) : ""))).join("") || '<p class="empty">暂无食品档案。</p>'}</div>
-    ${foodForm(`<input type="hidden" name="id" value="${escape(current?.id)}">`+foodProfileFields(current,categories),current?"保存档案":"创建档案")}
+    ${foodModuleForm(`<input type="hidden" name="id" value="${escape(current?.id)}">`+foodProfileFields(current,categories),current?"保存食品信息":"添加食品信息")}
     ${current?`<div class="section-heading"><h2>关联批次</h2></div><div class="panel food-list">${batches.map((row)=>
       link(foodHref(row),escape([row.batch||row.purchasedOn||"库存批次",row.locationName,foodAmount(row)].filter(Boolean).join(" · ")))).join("")||'<p class="empty">暂无关联批次。</p>'}</div>`+
       deleteControl("食品档案",current.name,intakeHidden("id",current.id)):""}</section>
-    <section><div class="section-heading"><h2>自定义子分类</h2></div>${foodForm(customField,"添加子分类")}</section>`);
+    <section><div class="section-heading"><h2>自定义子分类</h2></div>${foodModuleForm(customField,"添加子分类")}</section>`);
 }
 
 const foodActionPath = (row) => foodHref(row);
 const foodActionForm = (operation, content, button) =>
-  foodForm(`<input type="hidden" name="operation" value="${operation}">`+content,button);
+  foodModuleForm(`<input type="hidden" name="operation" value="${operation}">`+content,button);
 const foodQuick = (operation,label) => `<form method="post"><button class="button secondary" name="operation" value="${operation}">${label}</button></form>`;
 
 async function foodDetailPage(db,row,url) {
@@ -499,7 +505,7 @@ async function foodDetailPage(db,row,url) {
   const expiryText = days == null ? "" : days < 0 ? `已超过${expiryLabel} ${-days} 天` :
     days === 0 ? expiryLabel+"为今天" : `距${expiryLabel}还有 ${days} 天`;
   const basics = `<dl class="food-details panel">
-    ${metric("当前库存",foodAmount(row))}${metric("储存位置",row.locationName)}${metric("储存方式",row.storage)}
+    ${metric("当前库存",foodAmount(row))}${metric("存储位置",row.locationName)}${metric("储存方式",row.storage)}
     ${metric("包装状态",foodPackages[row.packaging])}${metric("购买时间",row.purchasedAtLocal?.replace("T"," ") || row.purchasedOn)}
     ${metric("记录创建时间",row.createdAt?.replace("T"," ").slice(0,19)+" UTC")}
     ${metric("购买数量",row.purchasedAmount == null ? null : row.purchasedAmount+" "+(row.purchasedUnit||""))}
@@ -512,7 +518,7 @@ async function foodDetailPage(db,row,url) {
     ${metric(row.portionParentId?"上次检查（含来源批次）":"上次检查",row.checkedOn)}${metric("下次检查",row.checkDays ? foodAddDays(row.checkedOn || row.purchasedOn || row.createdAt.slice(0,10),row.checkDays) : null)}
     ${metric("储存说明",row.storageAdvice)}</dl>`;
   const operationInput = '<input type="hidden" name="operation" value="move">';
-  const move = foodForm(operationInput + foodDropdown("locationId","目的位置",foodOptions(locations,row.locationId),"required") +
+  const move = foodModuleForm(operationInput + foodDropdown("locationId","目的位置",foodOptions(locations,row.locationId),"required") +
     foodDropdown("transition","记录状态事件",["move","freeze","thaw"].map((k)=>foodOption(k,foodEventLabels[k],"move")).join("")),"保存位置与状态");
   const adjust = foodActionForm("adjust",
     foodInput("amount","调整后的剩余量",row.remainingAmount,foodNumberAttrs) +
@@ -528,10 +534,10 @@ async function foodDetailPage(db,row,url) {
     <details><summary>更多操作</summary><div class="food-toolbar">${foodQuick("discard","标记丢弃")}${foodQuick("archive","归档")}</div></details>
     </div><div class="food-edit-grid"><section><h2>位置和状态</h2>${move}</section><section><h2>数量调整</h2>${adjust}</section></div>
     ${check ? "<section><div class='section-heading'><h2>储存检查</h2></div>"+check+"</section>" : ""}` : "";
-  const message = url.searchParams.has("saved") ? '<p class="notice" role="status">操作已保存。</p>' : "";
+  const message = url.searchParams.has("added") ? `<p class="notice" role="status">已记录这次购买的「${escape(foodTitle(row))}」，本次剩余 ${escape(foodAmount(row))}，位置：${escape(row.locationName||"待指定存储位置")}。其他购买记录保持不变。</p>` : url.searchParams.has("saved") ? '<p class="notice" role="status">操作已保存。</p>' : "";
   return render(foodBack(escape(foodTitle(row)),escape(row.archivedAt ? "已归档" : foodDispositions[row.disposition]),
     foodButton(foodHref(row)+"/edit","编辑批次")) + message +
-    (row.foodId ? `<div class="food-toolbar">${link(foodRoot+"/profiles?id="+encodeURIComponent(row.foodId),"查看食品档案")}</div>` : "") +
+    (row.foodId ? `<div class="food-toolbar">${link(foodRoot+"/profiles?id="+encodeURIComponent(row.foodId),"查看食品信息")}${link(foodRoot+"/new?foodId="+encodeURIComponent(row.foodId),"补充库存","button secondary")}</div>` : "") +
     (expiryText ? `<p class="notice">${escape(expiryText)}</p>` : "") + basics + controls + links +
     deleteControl("食品批次",foodTitle(row)+(row.batch?" · "+row.batch:""))+
     `<section><div class="section-heading"><h2>批次事件</h2></div><div class="panel food-list">
@@ -542,7 +548,7 @@ async function foodDetailPage(db,row,url) {
 async function foodEditPage(db,row) {
   const locations=await foodAll(db,"SELECT * FROM StorageLocation WHERE retired=0 OR id=? ORDER BY builtIn DESC,rowid",row.locationId);
   return render(foodBack("编辑批次",escape(foodTitle(row)),link(foodHref(row),"取消","button secondary"))+
-    foodForm(intakeHidden("operation","edit")+intakeHidden("version",row.updatedAt)+
+    foodModuleForm(intakeHidden("operation","edit")+intakeHidden("version",row.updatedAt)+
       '<p class="wide food-muted">修改到期日期会改用手填日期。选择新的保质期起点可按天数重新计算。</p>'+
       (row.disposition==="portioned"?'<p class="wide notice">已全部分装，编辑本批次仅修改资料，库存请在子批次中编辑。</p>':"")+
       foodBatchFields(row,locations,true),"保存批次"));
@@ -705,7 +711,7 @@ async function foodRoute(request, env, url) {
   if (request.method==="POST" && request.headers.get("origin")!==url.origin) return new Response("请求来源无效",{status:403});
   const form = request.method==="POST" ? await request.formData() : null;
   if (!part) return form ? new Response(null,{status:405}) : foodHome(db,url);
-  if (!subpage && part==="new") return foodNew(db,form);
+  if (!subpage && part==="new") return foodNew(db,form,url);
   if (!subpage && part==="locations") return foodManageLocations(db,form);
   if (!subpage && part==="profiles") return foodManageProfiles(db,form,url);
   if (!subpage && part==="intake") return foodIntake(request,env,form);
